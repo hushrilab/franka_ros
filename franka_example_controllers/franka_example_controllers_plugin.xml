@@ -54,4 +54,9 @@
           A PD controller that tracks position and velocity of the leader arm and applies it to the follower arm. It also applies force-feedback to the leader arm.
       </description>
   </class>
+    <class name="franka_example_controllers/MCRTCExampleController" type="franka_example_controllers::MCRTCExampleController" base_class_type="controller_interface::ControllerBase">
+      <description>
+          A test for mc_rtc.
+      </description>
+  </class>
 </library>

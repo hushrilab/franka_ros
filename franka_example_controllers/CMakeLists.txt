@@ -25,6 +25,10 @@ find_package(catkin REQUIRED COMPONENTS
 find_package(Eigen3 REQUIRED)
 find_package(Franka 0.7.0 REQUIRED)
 
+# added for mc_rtc
+find_package(mc_rtc 1.3.0 REQUIRED)
+include_directories(${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIR})
+
 add_message_files(FILES
   JointTorqueComparison.msg
 )
@@ -71,6 +75,7 @@ add_library(franka_example_controllers
   src/force_example_controller.cpp
   src/dual_arm_cartesian_impedance_example_controller.cpp
   src/teleop_joint_pd_example_controller.cpp
+  src/mc_rtc_example_controller.cpp
 )
 
 add_dependencies(franka_example_controllers
@@ -84,6 +89,9 @@ add_dependencies(franka_example_controllers
 target_link_libraries(franka_example_controllers PUBLIC
   ${Franka_LIBRARIES}
   ${catkin_LIBRARIES}
+  # added for mc_rtc
+  mc_rtc::mc_control 
+  mc_rtc::mc_rtc_ros
 )
 
 target_include_directories(franka_example_controllers SYSTEM PUBLIC

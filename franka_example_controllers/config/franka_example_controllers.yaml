@@ -147,6 +147,15 @@ teleop_joint_pd_example_controller:
        drift_comp_gains: [4.3, 4.3, 4.3, 4.3, 4.3, 4.3, 4.3]
        dq_max_lower: [0.8, 0.8, 0.8, 0.8, 2.5, 2.5, 2.5] # [rad/s]
        dq_max_upper: [2.0, 2.0, 2.0, 2.0, 2.5, 2.5, 2.5] # [rad/s]
-       ddq_max_lower: [0.8, 0.8, 0.8, 0.8, 10.0, 10.0, 10.0] # [rad/s²]
-       ddq_max_upper: [6.0, 6.0, 6.0, 6.0, 15.0, 20.0, 20.0] # [rad/s²]
-       contact_force_threshold: 5.0 # [N]
+       
+mc_rtc_example_controller:
+    type: franka_example_controllers/MCRTCExampleController
+    arm_id: panda
+    joint_names:
+        - panda_joint1
+        - panda_joint2
+        - panda_joint3
+        - panda_joint4
+        - panda_joint5
+        - panda_joint6
+        - panda_joint7
