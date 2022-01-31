@@ -160,11 +160,13 @@ void MyImpedanceController::update(const ros::Time& time, const ros::Duration& p
   std::array<double, 7> C_array = model_handle_->getCoriolis();
   std::array<double, 42> J_array =
       model_handle_->getZeroJacobian(franka::Frame::kEndEffector);
+      
+      
   std::array<double, 49> B_array = model_handle_->getMass();
   std::array<double, 7> g_array = model_handle_->getGravity();
   
   // convert to Eigen
-  Eigen::Map<Eigen::Matrix<double, 7, 7>> B(B_array.data());
+  Eigen::Map<Eigen::Matrix<double, 7, 7>> B (B_array.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> C(C_array.data());
   Eigen::Map<Eigen::Matrix<double, 6, 7>> J(J_array.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> g(g_array.data());
@@ -172,7 +174,14 @@ void MyImpedanceController::update(const ros::Time& time, const ros::Duration& p
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(robot_state.dq.data());
   
   ddq << ((dq_prev - dq_prev_prev) / period.toSec() + (dq - dq_prev) / period.toSec()) / 2;
+  
+  
+  
+  
   dJ << ((J_prev - J_prev_prev) / period.toSec() + (J - J_prev) / period.toSec()) / 2;
+  
+  
+  
   
   Eigen::Map<Eigen::Matrix<double, 7, 1>> tau_J_d(  // NOLINT (readability-identifier-naming)
       robot_state.tau_J_d.data());
