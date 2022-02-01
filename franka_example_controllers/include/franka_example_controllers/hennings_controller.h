@@ -77,6 +77,10 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   Eigen::Matrix<double, 6, 6> M_d;
   Eigen::Matrix<double, 6, 6> M_r;
   Eigen::Matrix<double, 6, 6> I;
+  Eigen::Matrix<double, 7, 7> K_N;
+  Eigen::Matrix<double, 7, 7> D_N;
+  Eigen::Matrix<double, 7, 1> q_nullspace;
+  Eigen::Matrix<double, 7, 1> N;
   Eigen::Matrix<double, 6, 1> F_ext;
   Eigen::Matrix<double, 6, 1> F_tau;
   Eigen::Matrix<double, 6, 7> djacobian;
@@ -87,8 +91,11 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   Eigen::Matrix<double, 7, 1> dq_prev_prev;
   
   Eigen::Vector3d position_d;
+  Eigen::Vector3d angles_d;
   Eigen::Vector3d velocity_d;
+  Eigen::Vector3d omega_d;
   Eigen::Vector3d acceleration_d;
+  Eigen::Vector3d domega_d;
   Eigen::Quaterniond orientation_d;
   std::mutex position_and_orientation_d_target_mutex_;
   Eigen::Vector3d position_d_target_;

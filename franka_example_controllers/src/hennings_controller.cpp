@@ -120,8 +120,12 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
   F_ext.setZero();
  
   M_d.diagonal() << 2, 2, 2, 2, 2, 2;
-  K_p.diagonal() << 50, 50, 50, 10, 10, 10;
+  K_p.diagonal() << 50, 50, 50, 20, 20, 20;  // for qauterionen error last three digits 20,20,20
   K_d.diagonal() << 20, 20, 20, 10, 10, 10;
+  
+  // Nullspace stiffness and damping
+  K_N.diagonal() << 15, 15, 15, 15, 15, 15, 15;
+  D_N.diagonal() << 4, 4, 4, 4, 4, 4, 4;
   
   return true;
 }
@@ -189,8 +193,8 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   Eigen::Affine3d transform(Eigen::Matrix4d::Map(robot_state.O_T_EE.data()));
   Eigen::Vector3d curr_position(transform.translation());
   Eigen::Quaterniond curr_orientation(transform.linear());
-  Eigen::Vector3d curr_angles;
-  curr_angles << curr_orientation.toRotationMatrix().eulerAngles(2, 1, 0);
+//   Eigen::Vector3d curr_angles;
+//   curr_angles << curr_orientation.toRotationMatrix().eulerAngles(0, 1, 2);
   
   Eigen::VectorXd curr_velocity(6);
   curr_velocity << jacobian * dq;
@@ -200,6 +204,8 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   
   //desired position and velocity
   
+//   // Circular Motion
+//   
 //   position_d <<  r * cos(omega * time.toSec()) + 0.55 - r,
 //                  r * sin(omega * time.toSec()), 
 //                  0.52;
@@ -218,15 +224,34 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   position_d <<  0.4,
                  0, 
                  0.52;
+
+  
+  double alpha, beta, gamma; // in degrees
+  
+  alpha = 0; // x-axis 
+  beta = 40;  // y-axis
+  gamma = 0; // z-axis compared to base frame in intial position
+  
+  angles_d << -M_PI - M_PI/180 * alpha, 
+               0    - M_PI/180 * beta,
+               0    - M_PI/180 * gamma;
+  
+  orientation_d =    Eigen::AngleAxisd(angles_d(0), Eigen::Vector3d::UnitX())
+                   * Eigen::AngleAxisd(angles_d(1), Eigen::Vector3d::UnitY())
+                   * Eigen::AngleAxisd(angles_d(2), Eigen::Vector3d::UnitZ());
                  
   velocity_d.setZero();
-                  
+  omega_d.setZero();
+  
   acceleration_d.setZero();
-                      
-  Eigen::VectorXd acc(6);
-  acc.setZero();
-  acc.head(3) << acceleration_d; 
-                  
+  domega_d.setZero();
+  
+  Eigen::VectorXd ddx(6);
+  ddx.setZero();
+  ddx.head(3) << acceleration_d; 
+  ddx.tail(3) << domega_d;    
+  
+  
   // compute error to desired pose
   // position error
   Eigen::Matrix<double, 6, 1> error;
@@ -239,8 +264,9 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   // Position Error
   error.head(3) << curr_position - position_d;
   
-  // orientation error
+  // orientation error 
   if (orientation_d.coeffs().dot(curr_orientation.coeffs()) < 0.0) {
+      // take short way around the circle and by using positve dot product of quaternions
     curr_orientation.coeffs() << -curr_orientation.coeffs();
   }
   // "difference" quaternion
@@ -248,12 +274,15 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   error.tail(3) << error_quaternion.x(), error_quaternion.y(), error_quaternion.z();
   // Transform to base frame
   error.tail(3) << -transform.linear() * error.tail(3);
+
   
   // Velocity Error
   derror << curr_velocity;
   derror.head(3) << derror.head(3) - velocity_d;
+  // TODO Orientation velcoity error
   
-  // Acceleration Error
+  
+  // Acceleration Error  // Might be unused
   dderror << curr_acceleration;
   dderror.head(3) << dderror.head(3) - acceleration_d;
   
@@ -297,7 +326,7 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 //   tau_0 << (nullspace_stiffness_ * (q_d_nullspace_ - q) -
 //                         (2.0 * sqrt(nullspace_stiffness_)) * dq);
 //   
-//   tau_task << jacobian.transpose() * (Lambda * (S_P * (acc - K_p * error - K_d * derror)
+//   tau_task << jacobian.transpose() * (Lambda * (S_P * (ddx - K_p * error - K_d * derror)
 //   /*+ S_F*(K_f * (F - F_d) + K_w * dF)*/ - djacobian * dq )) 
 //   + coriolis + (Eigen::MatrixXd::Identity(7, 7) - jacobian.transpose() * J_T_plus) * tau_0;
 //   
@@ -312,20 +341,19 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 
   Lambda << (jacobian * mass.inverse() * jacobian.transpose()).inverse();
    
-  F_tau = Lambda * acc - Lambda * M_d.inverse() * (K_d * derror + K_p * error) + (Lambda * M_d.inverse() - I) * F_ext - Lambda * djacobian * dq;
+  F_tau = Lambda * ddx - Lambda * M_d.inverse() * (K_d * derror + K_p * error) + (Lambda * M_d.inverse() - I) * F_ext - Lambda * djacobian * dq;
    
   tau_task = jacobian.transpose() * F_tau;
   
   // nullspace PD control with damping ratio = 1
   // TODO implement Null space handling from paper
  
-  tau_nullspace << (Eigen::MatrixXd::Identity(7, 7) -
-                    jacobian.transpose() * jacobian_transpose_pinv) *
-                       (nullspace_stiffness_ * (q_d_nullspace_ - q) -
-                        (2.0 * sqrt(nullspace_stiffness_)) * dq);
-                       
+  tau_nullspace << -K_N * (q - q_nullspace) - D_N * dq;
+     
+  N << Eigen::MatrixXd::Identity(7, 7) - jacobian.transpose() * Lambda * jacobian * mass.inverse();
+  
   // Desired torque
-  tau_d << tau_task + coriolis + tau_nullspace;
+  tau_d << tau_task + coriolis + N * tau_nullspace;
   
  
   
