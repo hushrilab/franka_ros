@@ -99,9 +99,6 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
 //   position_d_target_.setZero();
 //   orientation_d_target_.coeffs() << 0.0, 0.0, 0.0, 1.0;
 
-  K_cartesian.setZero(); // set stiffness matrix to zero
-  D_cartesian.setZero(); // set damping matrix to zero
-  
   
   // For PID Controller
   eint.setZero();
@@ -115,14 +112,16 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
   K_I.diagonal() << 0.2, 0.2, 0.2, 0.2, 0.2, 0.2;
   
 //   For Impedance Controller
-  K_d.setIdentity();
-  D_d.setIdentity();
-  M_d.setIdentity();
-  I.setIdentity();
-
-  M_d << M_d * 500;
-  D_d << D_d * 10;
-  K_d << K_d * 300;
+  
+  K_p.setIdentity(); // set stiffness matrix to zero
+  K_d.setIdentity(); // set damping matrix to zero
+  M_d.setIdentity(); // set damping matrix to zero
+  S_P.setIdentity();
+  F_ext.setZero();
+ 
+  M_d.diagonal() << 2, 2, 2, 2, 2, 2;
+  K_p.diagonal() << 50, 50, 50, 10, 10, 10;
+  K_d.diagonal() << 20, 20, 20, 10, 10, 10;
   
   return true;
 }
@@ -150,6 +149,11 @@ void HenningImpedanceController::starting(const ros::Time& /*time*/) {
   // set equilibrium point to current state
   position_d = initial_transform.translation();
   orientation_d = Eigen::Quaterniond(initial_transform.linear());
+    Eigen::Vector3d curr_angles;
+    curr_angles << orientation_d.toRotationMatrix().eulerAngles(0, 1, 2);
+    std::cout<<std::endl<< "Angles" << std::endl << curr_angles << std::endl;
+    std::cout<<"Initial Orient" << std::endl<<orientation_d.w()<<std::endl<<orientation_d.x()<<std::endl<<orientation_d.y()<<std::endl<<orientation_d.z()<<std::endl;
+   
 //   position_d_target_ = initial_transform.translation();
 //   orientation_d_target_ = Eigen::Quaterniond(initial_transform.linear());
 
@@ -175,6 +179,7 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   Eigen::Map<Eigen::Matrix<double, 7, 1>> q(robot_state.q.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(robot_state.dq.data());
   
+  
   ddq << ((dq_prev - dq_prev_prev) / period.toSec() + (dq - dq_prev) / period.toSec()) / 2;
   djacobian << ((jacobian_prev - jacobian_prev_prev) / period.toSec() + (jacobian - jacobian_prev) / period.toSec()) / 2;
   
@@ -184,6 +189,8 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   Eigen::Affine3d transform(Eigen::Matrix4d::Map(robot_state.O_T_EE.data()));
   Eigen::Vector3d curr_position(transform.translation());
   Eigen::Quaterniond curr_orientation(transform.linear());
+  Eigen::Vector3d curr_angles;
+  curr_angles << curr_orientation.toRotationMatrix().eulerAngles(2, 1, 0);
   
   Eigen::VectorXd curr_velocity(6);
   curr_velocity << jacobian * dq;
@@ -191,10 +198,12 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   Eigen::VectorXd curr_acceleration(6);
   curr_acceleration << jacobian * ddq + djacobian * dq;
   
-  // desired position and velocity
+  //desired position and velocity
+  
 //   position_d <<  r * cos(omega * time.toSec()) + 0.55 - r,
 //                  r * sin(omega * time.toSec()), 
 //                  0.52;
+//             
 //                  
 //   velocity_d <<  -r * omega * sin(omega * time.toSec()), 
 //                   r * omega * cos(omega * time.toSec()),
@@ -203,16 +212,20 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 //   acceleration_d <<  -r * omega * omega * cos(omega * time.toSec()), 
 //                      -r * omega * omega * sin(omega * time.toSec()), 
 //                       0;
+                      
   
   // Steady position
-  position_d <<  0.2,
-                 0.2, 
+  position_d <<  0.4,
+                 0, 
                  0.52;
                  
   velocity_d.setZero();
                   
   acceleration_d.setZero();
-  
+                      
+  Eigen::VectorXd acc(6);
+  acc.setZero();
+  acc.head(3) << acceleration_d; 
                   
   // compute error to desired pose
   // position error
@@ -254,36 +267,86 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   Eigen::MatrixXd jacobian_transpose_pinv;
   pseudoInverse(jacobian.transpose(), jacobian_transpose_pinv);
   
-// Force Control
-// External force on TCP
+  
+  
+// //////////////////////////  Force Control IEEE Paper //////////////////////////////////////
+  
+  // !!!!!!!!!!!!!!!!!!!!!!!!! Does not work !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! //
+  
+// // External force on TCP
 
-  f << D_d * derror + K_d * error;  
+//   f << D_d * derror + K_d * error;  
+//   
+//   M_r << (jacobian * mass.inverse() * jacobian.transpose()).inverse();
+//   
+//   tau_task << jacobian.transpose() * M_r * (M_d.inverse() * (D_d * derror + K_d * error)
+//             + jacobian * mass.inverse() * (coriolis /*+ gravity*/) - djacobian * dq) 
+//             + jacobian.transpose() * (I - M_r * M_d.inverse()) * f;
   
-  M_r << (jacobian * mass.inverse() * jacobian.transpose()).inverse();
   
-  tau_task << jacobian.transpose() * M_r * (M_d.inverse() * (D_d * derror + K_d * error)
-            + jacobian * mass.inverse() * (coriolis /*+ gravity*/) - djacobian * dq) 
-            + jacobian.transpose() * (I - M_r * M_d.inverse()) * f;
+  
+  
+//  //////////////////    Paper: Force Control of Redudant Robots, Bojan Nemec, 1997  /////////////////////
+  
+//   Lambda << (jacobian * mass.inverse() * jacobian.transpose()).inverse();
+//   
+// //   J_plus << mass.inverse() * jacobian.transpose() * Lambda;
+//   
+//   J_T_plus << Lambda * jacobian * mass.inverse();
+//   
+//   tau_0 << (nullspace_stiffness_ * (q_d_nullspace_ - q) -
+//                         (2.0 * sqrt(nullspace_stiffness_)) * dq);
+//   
+//   tau_task << jacobian.transpose() * (Lambda * (S_P * (acc - K_p * error - K_d * derror)
+//   /*+ S_F*(K_f * (F - F_d) + K_w * dF)*/ - djacobian * dq )) 
+//   + coriolis + (Eigen::MatrixXd::Identity(7, 7) - jacobian.transpose() * J_T_plus) * tau_0;
+//   
+//  // Desired torque
+//  tau_d << tau_task;
+  
+  
+// ///////////////////  Paper: Cartesian Impedance Control of Redundant Robots:       /////////////////////////
+// //////////////////          Recent Results with the DLR-Light-Weight-Arms, DLR    /////////////////////////
+ 
+  
+
+  Lambda << (jacobian * mass.inverse() * jacobian.transpose()).inverse();
    
+  F_tau = Lambda * acc - Lambda * M_d.inverse() * (K_d * derror + K_p * error) + (Lambda * M_d.inverse() - I) * F_ext - Lambda * djacobian * dq;
+   
+  tau_task = jacobian.transpose() * F_tau;
   
-//   // PID controller
-//   eint << eint + error * period.toSec();
-//   
-//   
-//   // Cartesian PID control with damping ratio = 1
-//   tau_task << jacobian.transpose() * (-K_P * error -K_D * derror -K_I * eint);
-  
- std::cout << "Error" <<std::endl<< error <<std::endl; 
-     
   // nullspace PD control with damping ratio = 1
+  // TODO implement Null space handling from paper
+ 
   tau_nullspace << (Eigen::MatrixXd::Identity(7, 7) -
                     jacobian.transpose() * jacobian_transpose_pinv) *
                        (nullspace_stiffness_ * (q_d_nullspace_ - q) -
                         (2.0 * sqrt(nullspace_stiffness_)) * dq);
                        
-                       
   // Desired torque
-  tau_d << tau_task /*+ coriolis*/ + tau_nullspace;
+  tau_d << tau_task + coriolis + tau_nullspace;
+  
+ 
+  
+//  ////////////////////////////////////      PID controller     /////////////////////////////////////////
+  
+//   eint << eint + error * period.toSec();
+//   
+//   
+//   // Cartesian PID control
+//   tau_task << jacobian.transpose() * (-K_P * error -K_D * derror -K_I * eint);
+  
+//  // nullspace PD control with damping ratio = 1
+  
+//   tau_nullspace << (Eigen::MatrixXd::Identity(7, 7) -
+//                     jacobian.transpose() * jacobian_transpose_pinv) *
+//                        (nullspace_stiffness_ * (q_d_nullspace_ - q) -
+//                         (2.0 * sqrt(nullspace_stiffness_)) * dq);
+//   
+//   // Desired torque
+//   tau_d << tau_task + coriolis + tau_nullspace;     
+
   
   
   // Saturate torque rate to avoid discontinuities
@@ -292,24 +355,13 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
     joint_handles_[i].setCommand(tau_d(i));
   }
   
+  //  std::cout << "Error" <<std::endl<< error <<std::endl; 
+  
   dq_prev << dq;
   dq_prev_prev << dq_prev;
   jacobian_prev << jacobian;
   jacobian_prev_prev << jacobian_prev;
   
-
-//   // update parameters changed online either through dynamic reconfigure or through the interactive
-//   // target by filtering
-//   cartesian_stiffness_ =
-//       filter_params_ * cartesian_stiffness_target_ + (1.0 - filter_params_) * cartesian_stiffness_;
-//   cartesian_damping_ =
-//       filter_params_ * cartesian_damping_target_ + (1.0 - filter_params_) * cartesian_damping_;
-//   nullspace_stiffness_ =
-//       filter_params_ * nullspace_stiffness_target_ + (1.0 - filter_params_) * nullspace_stiffness_;
-//   std::lock_guard<std::mutex> position_dtarget_mutex_lock(
-//       position_and_orientation_d_target_mutex_);
-//   position_d = filter_params_ * position_d_target_ + (1.0 - filter_params_) * position_d;
-//   orientation_d = orientation_d.slerp(filter_params_, orientation_d_target_);
 }
 
 Eigen::Matrix<double, 7, 1> HenningImpedanceController::saturateTorqueRate(
@@ -323,36 +375,6 @@ Eigen::Matrix<double, 7, 1> HenningImpedanceController::saturateTorqueRate(
   }
   return tau_d_saturated;
 }
-
-// void HenningImpedanceController::complianceParamCallback(
-//     franka_example_controllers::compliance_paramConfig& config,
-//     uint32_t /*level*/) {
-//   cartesian_stiffness_target_.setIdentity();
-//   cartesian_stiffness_target_.topLeftCorner(3, 3)
-//       << config.translational_stiffness * Eigen::Matrix3d::Identity();
-//   cartesian_stiffness_target_.bottomRightCorner(3, 3)
-//       << config.rotational_stiffness * Eigen::Matrix3d::Identity();
-//   cartesian_damping_target_.setIdentity();
-//   // Damping ratio = 1
-//   cartesian_damping_target_.topLeftCorner(3, 3)
-//       << 2.0 * sqrt(config.translational_stiffness) * Eigen::Matrix3d::Identity();
-//   cartesian_damping_target_.bottomRightCorner(3, 3)
-//       << 2.0 * sqrt(config.rotational_stiffness) * Eigen::Matrix3d::Identity();
-//   nullspace_stiffness_target_ = config.nullspace_stiffness;
-// }
-
-// void HenningImpedanceController::equilibriumPoseCallback(
-//     const geometry_msgs::PoseStampedConstPtr& msg) {
-//   std::lock_guard<std::mutex> position_dtarget_mutex_lock(
-//       position_and_orientation_d_target_mutex_);
-//   position_d_target_ << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
-//   Eigen::Quaterniond last_orientation_d_target(orientation_d_target_);
-//   orientation_d_target_.coeffs() << msg->pose.orientation.x, msg->pose.orientation.y,
-//       msg->pose.orientation.z, msg->pose.orientation.w;
-//   if (last_orientation_d_target.coeffs().dot(orientation_d_target_.coeffs()) < 0.0) {
-//     orientation_d_target_.coeffs() << -orientation_d_target_.coeffs();
-//   }
-// }
 
 }  // namespace franka_example_controllers
 

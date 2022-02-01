@@ -61,12 +61,24 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   Eigen::Matrix<double, 6, 6> K_I;
   Eigen::Matrix<double, 6, 1> eint;
   
+  
+  
+  Eigen::Matrix<double, 6, 6> Lambda;
+  Eigen::Matrix<double, 7, 6> J_plus;
+  Eigen::Matrix<double, 6, 7> J_T_plus;
+  Eigen::Matrix<double, 6, 6> S_P;
+  Eigen::Matrix<double, 6, 6> S_f;
+  Eigen::Matrix<double, 7, 1> tau_0;
+//   Eigen::Matrix<double, 7, 7> I;
+  
+  
+  Eigen::Matrix<double, 6, 6> K_p;
   Eigen::Matrix<double, 6, 6> K_d;
-  Eigen::Matrix<double, 6, 6> D_d;
   Eigen::Matrix<double, 6, 6> M_d;
   Eigen::Matrix<double, 6, 6> M_r;
   Eigen::Matrix<double, 6, 6> I;
-  Eigen::Matrix<double, 6, 1> f;
+  Eigen::Matrix<double, 6, 1> F_ext;
+  Eigen::Matrix<double, 6, 1> F_tau;
   Eigen::Matrix<double, 6, 7> djacobian;
   Eigen::Matrix<double, 6, 7> jacobian_prev;
   Eigen::Matrix<double, 6, 7> jacobian_prev_prev;
