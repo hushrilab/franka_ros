@@ -90,13 +90,17 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   Eigen::Matrix<double, 7, 1> dq_prev;
   Eigen::Matrix<double, 7, 1> dq_prev_prev;
   
+  double alpha, beta, gamma; // in degrees
+  
   Eigen::Vector3d position_d;
   Eigen::Vector3d angles_d;
   Eigen::Vector3d velocity_d;
-  Eigen::Vector3d omega_d;
   Eigen::Vector3d acceleration_d;
-  Eigen::Vector3d domega_d;
   Eigen::Quaterniond orientation_d;
+  Eigen::Vector3d omega_d_local;
+  Eigen::Vector3d omega_d_global;
+  Eigen::Vector3d domega_d_local;
+  Eigen::Vector3d domega_d_global;
   std::mutex position_and_orientation_d_target_mutex_;
   Eigen::Vector3d position_d_target_;
   Eigen::Quaterniond orientation_d_target_;

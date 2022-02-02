@@ -119,9 +119,9 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
   S_P.setIdentity();
   F_ext.setZero();
  
-  M_d.diagonal() << 2, 2, 2, 2, 2, 2;
-  K_p.diagonal() << 50, 50, 50, 20, 20, 20;  // for qauterionen error last three digits 20,20,20
-  K_d.diagonal() << 20, 20, 20, 10, 10, 10;
+  M_d.diagonal() << 0.5, 0.5, 0.5, 0.5, 0.5, 0.5;
+  K_p.diagonal() << 50, 50, 50, 150, 150, 150;  // for qauterionen error with franka last three digits 150,150,150
+  K_d.diagonal() << 20, 20, 20, 30, 30, 30;
   
   // Nullspace stiffness and damping
   K_N.diagonal() << 15, 15, 15, 15, 15, 15, 15;
@@ -140,11 +140,8 @@ void HenningImpedanceController::starting(const ros::Time& /*time*/) {
       
   Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
   jacobian_prev << jacobian;
-  jacobian_prev_prev << jacobian;
   
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(initial_state.dq.data());
-  dq_prev << dq;
-  dq_prev_prev << dq;
   
   // convert to eigen
   Eigen::Map<Eigen::Matrix<double, 7, 1>> q_initial(initial_state.q.data());
@@ -153,10 +150,11 @@ void HenningImpedanceController::starting(const ros::Time& /*time*/) {
   // set equilibrium point to current state
   position_d = initial_transform.translation();
   orientation_d = Eigen::Quaterniond(initial_transform.linear());
-    Eigen::Vector3d curr_angles;
-    curr_angles << orientation_d.toRotationMatrix().eulerAngles(0, 1, 2);
-    std::cout<<std::endl<< "Angles" << std::endl << curr_angles << std::endl;
-    std::cout<<"Initial Orient" << std::endl<<orientation_d.w()<<std::endl<<orientation_d.x()<<std::endl<<orientation_d.y()<<std::endl<<orientation_d.z()<<std::endl;
+  Eigen::Vector3d curr_angles;
+  curr_angles << orientation_d.toRotationMatrix().eulerAngles(0, 1, 2);
+  std::cout<<std::endl<< "Angles" << std::endl << curr_angles << std::endl;
+  std::cout<<"Initial Orient" << std::endl<<orientation_d.coeffs()<<std::endl;
+    
    
 //   position_d_target_ = initial_transform.translation();
 //   orientation_d_target_ = Eigen::Quaterniond(initial_transform.linear());
@@ -184,8 +182,7 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(robot_state.dq.data());
   
   
-  ddq << ((dq_prev - dq_prev_prev) / period.toSec() + (dq - dq_prev) / period.toSec()) / 2;
-  djacobian << ((jacobian_prev - jacobian_prev_prev) / period.toSec() + (jacobian - jacobian_prev) / period.toSec()) / 2;
+  djacobian << (jacobian - jacobian_prev) / period.toSec();
   
   Eigen::Map<Eigen::Matrix<double, 7, 1>> tau_J_d(  // NOLINT (readability-identifier-naming)
       robot_state.tau_J_d.data());
@@ -220,40 +217,46 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 //                       0;
                       
   
-  // Steady position
-  position_d <<  0.4,
-                 0, 
-                 0.52;
-
+  // Position
   
-  double alpha, beta, gamma; // in degrees
-  
-  alpha = 0; // x-axis 
-  beta = 40;  // y-axis
-  gamma = 0; // z-axis compared to base frame in intial position
-  
-  angles_d << -M_PI - M_PI/180 * alpha, 
-               0    - M_PI/180 * beta,
-               0    - M_PI/180 * gamma;
-  
-  orientation_d =    Eigen::AngleAxisd(angles_d(0), Eigen::Vector3d::UnitX())
-                   * Eigen::AngleAxisd(angles_d(1), Eigen::Vector3d::UnitY())
-                   * Eigen::AngleAxisd(angles_d(2), Eigen::Vector3d::UnitZ());
-                 
   velocity_d.setZero();
-  omega_d.setZero();
   
   acceleration_d.setZero();
-  domega_d.setZero();
+  
+  position_d <<  0.5 + velocity_d(0) * time.toSec() + 0.5 * acceleration_d(0) * time.toSec() * time.toSec(),
+                   0 + velocity_d(1) * time.toSec() + 0.5 * acceleration_d(1) * time.toSec() * time.toSec(), 
+                 0.5 + velocity_d(2) * time.toSec() + 0.5 * acceleration_d(2) * time.toSec() * time.toSec();
+  
+  
+ // Orientation  
+                 
+  omega_d_local << 0 , 0, 1;          // in hand coordinate system
+  omega_d_global << transform.linear() * omega_d_local;
+  
+  domega_d_local.setZero();          // in hand coordinate system
+  domega_d_global << transform.linear() * domega_d_local;
+
+  
+  alpha = 0 + omega_d_global(0) * time.toSec() + 0.5 * domega_d_global(0) * time.toSec() * time.toSec();    // x-axis (roll)
+  beta  = 0 + omega_d_global(1) * time.toSec() + 0.5 * domega_d_global(1) * time.toSec() * time.toSec();;   // y-axis (pitch)
+  gamma = 0 + omega_d_global(2) * time.toSec() + 0.5 * domega_d_global(2) * time.toSec() * time.toSec();;   // z-axis (yaw) compared to base frame in intial position
+  
+  angles_d <<  M_PI + M_PI/180 * alpha, 
+                    + M_PI/180 * beta,
+                    + M_PI/180 * gamma;
+
+  orientation_d =    Eigen::AngleAxisd(angles_d(0), Eigen::Vector3d::UnitX())
+                   * Eigen::AngleAxisd(angles_d(1), Eigen::Vector3d::UnitY())
+                   * Eigen::AngleAxisd(angles_d(2), Eigen::Vector3d::UnitZ());              
+               
   
   Eigen::VectorXd ddx(6);
   ddx.setZero();
   ddx.head(3) << acceleration_d; 
-  ddx.tail(3) << domega_d;    
-  
-  
-  // compute error to desired pose
-  // position error
+  ddx.tail(3) << domega_d_global;    
+        
+  // compute errors to desired pose
+ 
   Eigen::Matrix<double, 6, 1> error;
   Eigen::Matrix<double, 6, 1> derror;
   Eigen::Matrix<double, 6, 1> dderror;
@@ -264,14 +267,33 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   // Position Error
   error.head(3) << curr_position - position_d;
   
-  // orientation error 
+  // Orientation error 
   if (orientation_d.coeffs().dot(curr_orientation.coeffs()) < 0.0) {
       // take short way around the circle and by using positve dot product of quaternions
     curr_orientation.coeffs() << -curr_orientation.coeffs();
   }
-  // "difference" quaternion
+  
+  // difference between quaternions
+  
+//  // orientation Error According to Silciano
+//   
+//   Eigen::Vector3d quat_d, quat_c;
+//   
+//   quat_d << orientation_d.x(),
+//             orientation_d.y(),
+//             orientation_d.z();
+//             
+//   quat_c << curr_orientation.x(),
+//             curr_orientation.y(),
+//             curr_orientation.z();
+//   
+//   error.tail(3) << curr_orientation.w() * quat_d - orientation_d.w() * quat_c - quat_d.cross(quat_c);
+  
+  // Orientation Error according to Franka Emika (the same when cross Product of Silciano is quat_c.cross(quat_d))
+  
   Eigen::Quaterniond error_quaternion(curr_orientation.inverse() * orientation_d);
   error.tail(3) << error_quaternion.x(), error_quaternion.y(), error_quaternion.z();
+  
   // Transform to base frame
   error.tail(3) << -transform.linear() * error.tail(3);
 
@@ -279,23 +301,17 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   // Velocity Error
   derror << curr_velocity;
   derror.head(3) << derror.head(3) - velocity_d;
-  // TODO Orientation velcoity error
-  
+  derror.tail(3) << derror.tail(3) - omega_d_global;
+
   
   // Acceleration Error  // Might be unused
   dderror << curr_acceleration;
   dderror.head(3) << dderror.head(3) - acceleration_d;
+  dderror.tail(3) << dderror.tail(3) - domega_d_global;
   
-  
-  // compute control
-  // allocate variables
+  // Compute Control
+  // Allocate variables
   Eigen::VectorXd tau_task(7), tau_nullspace(7), tau_d(7);
-
-  // pseudoinverse for nullspace handling
-  // kinematic pseuoinverse
-  Eigen::MatrixXd jacobian_transpose_pinv;
-  pseudoInverse(jacobian.transpose(), jacobian_transpose_pinv);
-  
   
   
 // //////////////////////////  Force Control IEEE Paper //////////////////////////////////////
@@ -314,8 +330,8 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   
   
   
-  
 //  //////////////////    Paper: Force Control of Redudant Robots, Bojan Nemec, 1997  /////////////////////
+  
   
 //   Lambda << (jacobian * mass.inverse() * jacobian.transpose()).inverse();
 //   
@@ -345,8 +361,7 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
    
   tau_task = jacobian.transpose() * F_tau;
   
-  // nullspace PD control with damping ratio = 1
-  // TODO implement Null space handling from paper
+  // nullspace PD control
  
   tau_nullspace << -K_N * (q - q_nullspace) - D_N * dq;
      
@@ -358,6 +373,10 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
  
   
 //  ////////////////////////////////////      PID controller     /////////////////////////////////////////
+  
+//   // pseudoinverse for nullspace handling
+//   Eigen::MatrixXd jacobian_transpose_pinv;
+//   pseudoInverse(jacobian.transpose(), jacobian_transpose_pinv);
   
 //   eint << eint + error * period.toSec();
 //   
@@ -374,8 +393,8 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 //   
 //   // Desired torque
 //   tau_d << tau_task + coriolis + tau_nullspace;     
-
   
+// ////////////////////////////////////////////////////////////////////////////////////////////////////////
   
   // Saturate torque rate to avoid discontinuities
   tau_d << saturateTorqueRate(tau_d, tau_J_d);
@@ -383,13 +402,10 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
     joint_handles_[i].setCommand(tau_d(i));
   }
   
-  //  std::cout << "Error" <<std::endl<< error <<std::endl; 
-  
-  dq_prev << dq;
-  dq_prev_prev << dq_prev;
+   std::cout << "Error" <<std::endl<< error <<std::endl; 
+
   jacobian_prev << jacobian;
-  jacobian_prev_prev << jacobian_prev;
-  
+
 }
 
 Eigen::Matrix<double, 7, 1> HenningImpedanceController::saturateTorqueRate(
