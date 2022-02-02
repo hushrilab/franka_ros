@@ -92,7 +92,6 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   
   double alpha, beta, gamma; // in degrees
   
-  
   Eigen::Vector3d position_d;
   Eigen::Vector3d angles_d;
   Eigen::Vector3d velocity_d;
