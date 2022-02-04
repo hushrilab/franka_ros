@@ -36,13 +36,17 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   Eigen::Matrix<double, 7, 1> saturateTorqueRate(
       const Eigen::Matrix<double, 7, 1>& tau_d_calculated,
       const Eigen::Matrix<double, 7, 1>& tau_J_d);  // NOLINT (readability-identifier-naming)
+  
+  // Filter
+    void Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input,  const Eigen::MatrixXd& input_prev,
+    const Eigen::MatrixXd& y_prev,  Eigen::MatrixXd& y);  // NOLINT (readability-identifier-naming)  
 
   std::unique_ptr<franka_hw::FrankaStateHandle> state_handle_;
   std::unique_ptr<franka_hw::FrankaModelHandle> model_handle_;
   std::vector<hardware_interface::JointHandle> joint_handles_;
   
   // for trajectory
-  double r {0.1};
+  double r {0.2};
   double omega {1};
   
   double filter_params_{0.005};
@@ -79,16 +83,25 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   Eigen::Matrix<double, 6, 6> I;
   Eigen::Matrix<double, 7, 7> K_N;
   Eigen::Matrix<double, 7, 7> D_N;
+  Eigen::Matrix<double, 7, 7> D_eta;
+  Eigen::Matrix<double, 7, 7> K_p0;
   Eigen::Matrix<double, 7, 1> q_nullspace;
   Eigen::Matrix<double, 7, 1> N;
-  Eigen::Matrix<double, 6, 1> F_ext;
   Eigen::Matrix<double, 6, 1> F_tau;
   Eigen::Matrix<double, 6, 7> djacobian;
   Eigen::Matrix<double, 6, 7> jacobian_prev;
-  Eigen::Matrix<double, 6, 7> jacobian_prev_prev;
-  Eigen::Matrix<double, 7, 1> ddq;
   Eigen::Matrix<double, 7, 1> dq_prev;
-  Eigen::Matrix<double, 7, 1> dq_prev_prev;
+  Eigen::Matrix<double, 7, 1> ddq;
+  Eigen::Matrix<double, 7, 1> ddq_max;
+  Eigen::Matrix<double, 7, 1> tau_max;
+
+  
+  // For filtering
+  Eigen::Matrix<double, 6, 1> F_ext_filtered;
+  Eigen::Matrix<double, 6, 1> F_ext_prev;
+  Eigen::Matrix<double, 7, 1> ddq_prev;
+  Eigen::Matrix<double, 7, 1> ddq_filtered;
+
   
   double alpha, beta, gamma; // in degrees
   
@@ -101,9 +114,9 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   Eigen::Vector3d omega_d_global;
   Eigen::Vector3d domega_d_local;
   Eigen::Vector3d domega_d_global;
-  std::mutex position_and_orientation_d_target_mutex_;
-  Eigen::Vector3d position_d_target_;
-  Eigen::Quaterniond orientation_d_target_;
+//   std::mutex position_and_orientation_d_target_mutex_;
+//   Eigen::Vector3d position_d_target_;
+//   Eigen::Quaterniond orientation_d_target_;
 
   // Dynamic reconfigure
   std::unique_ptr<dynamic_reconfigure::Server<franka_example_controllers::compliance_paramConfig>>

@@ -130,15 +130,6 @@ void CartesianImpedanceExampleController::starting(const ros::Time& time) {
   position_d_target_ = initial_transform.translation();
   orientation_d_target_ = Eigen::Quaterniond(initial_transform.linear());
 
-
-// // // My ideas
-// //     double r = 0.1;
-// //     double omega = 0.63;
-// //     position_d_ <<  r * cos(omega * time.toSec()) + 0.45, r * sin(omega * time.toSec()), 0.52;
-// //     orientation_d_ = Eigen::Quaterniond(initial_transform.linear());
-// //     position_d_target_ <<  position_d_;
-// //     orientation_d_target_ = Eigen::Quaterniond(initial_transform.linear());
-// // //
   // set nullspace equilibrium configuration to initial q
   q_d_nullspace_ = q_initial;
 }
@@ -168,17 +159,17 @@ void CartesianImpedanceExampleController::update(const ros::Time& time,
   Eigen::Vector3d position(transform.translation());
   Eigen::Quaterniond orientation(transform.linear());
   
-// My ideas
-  double r = 0.1;
-  double omega = 0.63;
-  position_d_ <<  r * cos(omega * time.toSec()) + 0.55 - r,
-                  r * sin(omega * time.toSec()), 
-                  0.52;
-  velocity_d_ <<  -r * omega * sin(omega * time.toSec()), 
-                  r * omega * cos(omega * time.toSec()), 
-                  0;
-    position_d_target_ <<  position_d_;
-//
+// // My ideas
+//   double r = 0.1;
+//   double omega = 0.63;
+//   position_d_ <<  r * cos(omega * time.toSec()) + 0.55 - r,
+//                   r * sin(omega * time.toSec()), 
+//                   0.52;
+//   velocity_d_ <<  -r * omega * sin(omega * time.toSec()), 
+//                   r * omega * cos(omega * time.toSec()), 
+//                   0;
+//     position_d_target_ <<  position_d_;
+// //
   // compute error to desired pose
   // position error
   Eigen::Matrix<double, 6, 1> error;

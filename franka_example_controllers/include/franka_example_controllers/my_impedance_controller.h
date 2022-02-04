@@ -61,11 +61,8 @@ class MyImpedanceController : public controller_interface::MultiInterfaceControl
   Eigen::Matrix<double, 6, 6> K_I;
   Eigen::Matrix<double, 6, 1> eint;
   
-  Eigen::Matrix<double, 3, 3> K_d;
-  Eigen::Matrix<double, 3, 3> D_d;
-  Eigen::Matrix<double, 3, 3> M_d;
-  Eigen::Matrix<double, 7, 7> K_n;
-  Eigen::Matrix<double, 6, 6> M_r;
+  
+  
   Eigen::Matrix<double, 6, 6> Lambda;
   Eigen::Matrix<double, 7, 6> J_plus;
   Eigen::Matrix<double, 6, 7> J_T_plus;
@@ -73,19 +70,17 @@ class MyImpedanceController : public controller_interface::MultiInterfaceControl
   Eigen::Matrix<double, 6, 6> S_f;
   Eigen::Matrix<double, 7, 1> tau_0;
   Eigen::Matrix<double, 7, 7> I;
+  
+  
+  Eigen::Matrix<double, 6, 6> K_d;
+  Eigen::Matrix<double, 6, 6> D_d;
+  Eigen::Matrix<double, 6, 6> M_d;
+  Eigen::Matrix<double, 6, 6> M_r;
+//   Eigen::Matrix<double, 6, 6> I;
   Eigen::Matrix<double, 6, 1> f;
-  Eigen::Matrix<double, 7, 1> gamma;
-  Eigen::Matrix<double, 7, 1> dgamma;
-  Eigen::Matrix<double, 7, 1> gamma_prev;
-  Eigen::Matrix<double, 7, 1> vec;
-  Eigen::Matrix<double, 7, 1> e_n;
-  Eigen::Matrix<double, 7, 1> Phi;
-  Eigen::Matrix<double, 6, 7> dJ;
-  Eigen::Matrix<double, 7, 6> J_inverse;
-  Eigen::Matrix<double, 7, 6> J_inverse_prev;
-  Eigen::Matrix<double, 7, 6> dJ_inverse;
-  Eigen::Matrix<double, 6, 7> J_prev;
-  Eigen::Matrix<double, 6, 7> J_prev_prev;
+  Eigen::Matrix<double, 6, 7> djacobian;
+  Eigen::Matrix<double, 6, 7> jacobian_prev;
+  Eigen::Matrix<double, 6, 7> jacobian_prev_prev;
   Eigen::Matrix<double, 7, 1> ddq;
   Eigen::Matrix<double, 7, 1> dq_prev;
   Eigen::Matrix<double, 7, 1> dq_prev_prev;

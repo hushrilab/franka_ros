@@ -102,23 +102,26 @@ bool MyImpedanceController::init(hardware_interface::RobotHW* robot_hw,
   K_cartesian.setZero(); // set stiffness matrix to zero
   D_cartesian.setZero(); // set damping matrix to zero
   
-
+  // For PID Controller
+  eint.setZero();
+  
+  K_P.setIdentity();
+  K_I.setIdentity();
+  K_D.setIdentity();
+  
+  K_P.diagonal() << 300, 300, 300, 60, 60, 60;
+  K_D.diagonal() << 10, 10, 10, 5, 5, 5;
+  K_I.diagonal() << 0.2, 0.2, 0.2, 0.2, 0.2, 0.2;
   
 //   For Impedance Controller
   K_d.setIdentity();
   D_d.setIdentity();
   M_d.setIdentity();
   I.setIdentity();
-  f.setZero();
-  gamma_prev.setZero();
-  J_inverse_prev.setZero();
-  K_n.setIdentity();
-  
-  S_P.setIdentity();
 
-  M_d << M_d * 5;
-  D_d << D_d * 5;
-  K_d << K_d * 30;
+  M_d << M_d * 500;
+  D_d << D_d * 10;
+  K_d << K_d * 300;
   
   return true;
 }
@@ -127,13 +130,13 @@ void MyImpedanceController::starting(const ros::Time& /*time*/) {
   // compute initial velocity with J and set x_attractor and q_d_nullspace
   // to initial configuration
   franka::RobotState initial_state = state_handle_->getRobotState();
-  // get J
-  std::array<double, 42> J_array =
+  // get jacobian
+  std::array<double, 42> jacobian_array =
       model_handle_->getZeroJacobian(franka::Frame::kEndEffector);
       
-  Eigen::Map<Eigen::Matrix<double, 6, 7>> J(J_array.data());
-  J_prev << J;
-  J_prev_prev << J;
+  Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
+  jacobian_prev << jacobian;
+  jacobian_prev_prev << jacobian;
   
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(initial_state.dq.data());
   dq_prev << dq;
@@ -155,33 +158,24 @@ void MyImpedanceController::starting(const ros::Time& /*time*/) {
 
 void MyImpedanceController::update(const ros::Time& time, const ros::Duration& period) {
     
-  // get state variables
+// get state variables
   franka::RobotState robot_state = state_handle_->getRobotState();
-  std::array<double, 7> C_array = model_handle_->getCoriolis();
-  std::array<double, 42> J_array =
+  std::array<double, 7> coriolis_array = model_handle_->getCoriolis();
+  std::array<double, 42> jacobian_array =
       model_handle_->getZeroJacobian(franka::Frame::kEndEffector);
-      
-      
-  std::array<double, 49> B_array = model_handle_->getMass();
-  std::array<double, 7> g_array = model_handle_->getGravity();
+  std::array<double, 49> mass_array = model_handle_->getMass();
+  std::array<double, 7> gravity_array = model_handle_->getGravity();
   
   // convert to Eigen
-  Eigen::Map<Eigen::Matrix<double, 7, 7>> B (B_array.data());
-  Eigen::Map<Eigen::Matrix<double, 7, 1>> C(C_array.data());
-  Eigen::Map<Eigen::Matrix<double, 6, 7>> J(J_array.data());
-  Eigen::Map<Eigen::Matrix<double, 7, 1>> g(g_array.data());
+  Eigen::Map<Eigen::Matrix<double, 7, 7>> mass(mass_array.data());
+  Eigen::Map<Eigen::Matrix<double, 7, 1>> coriolis(coriolis_array.data());
+  Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
+  Eigen::Map<Eigen::Matrix<double, 7, 1>> gravity(gravity_array.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> q(robot_state.q.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(robot_state.dq.data());
   
   ddq << ((dq_prev - dq_prev_prev) / period.toSec() + (dq - dq_prev) / period.toSec()) / 2;
-  
-  
-  
-  
-  dJ << ((J_prev - J_prev_prev) / period.toSec() + (J - J_prev) / period.toSec()) / 2;
-  
-  
-  
+  djacobian << ((jacobian_prev - jacobian_prev_prev) / period.toSec() + (jacobian - jacobian_prev) / period.toSec()) / 2;
   
   Eigen::Map<Eigen::Matrix<double, 7, 1>> tau_J_d(  // NOLINT (readability-identifier-naming)
       robot_state.tau_J_d.data());
@@ -191,10 +185,10 @@ void MyImpedanceController::update(const ros::Time& time, const ros::Duration& p
   Eigen::Quaterniond curr_orientation(transform.linear());
   
   Eigen::VectorXd curr_velocity(6);
-  curr_velocity << J * dq;
+  curr_velocity << jacobian * dq;
   
   Eigen::VectorXd curr_acceleration(6);
-  curr_acceleration << J * ddq + dJ * dq;
+  curr_acceleration << jacobian * ddq + djacobian * dq;
   
   // desired position and velocity
 //   position_d <<  r * cos(omega * time.toSec()) + 0.55 - r,
@@ -210,7 +204,7 @@ void MyImpedanceController::update(const ros::Time& time, const ros::Duration& p
 //                       0;
   
   // Steady position
-  position_d <<  0.55,
+  position_d <<  0.2,
                  0.2, 
                  0.52;
                  
@@ -231,15 +225,15 @@ void MyImpedanceController::update(const ros::Time& time, const ros::Duration& p
   // Position Error
   error.head(3) << curr_position - position_d;
   
-//   // orientation error
-//   if (orientation_d.coeffs().dot(curr_orientation.coeffs()) < 0.0) {
-//     curr_orientation.coeffs() << -curr_orientation.coeffs();
-//   }
-//   // "difference" quaternion
-//   Eigen::Quaterniond error_quaternion(curr_orientation.inverse() * orientation_d);
-//   error.tail(3) << error_quaternion.x(), error_quaternion.y(), error_quaternion.z();
-//   // Transform to base frame
-//   error.tail(3) << -transform.linear() * error.tail(3);
+  // orientation error
+  if (orientation_d.coeffs().dot(curr_orientation.coeffs()) < 0.0) {
+    curr_orientation.coeffs() << -curr_orientation.coeffs();
+  }
+  // "difference" quaternion
+  Eigen::Quaterniond error_quaternion(curr_orientation.inverse() * orientation_d);
+  error.tail(3) << error_quaternion.x(), error_quaternion.y(), error_quaternion.z();
+  // Transform to base frame
+  error.tail(3) << -transform.linear() * error.tail(3);
   
   // Velocity Error
   derror << curr_velocity;
@@ -256,66 +250,58 @@ void MyImpedanceController::update(const ros::Time& time, const ros::Duration& p
 
   // pseudoinverse for nullspace handling
   // kinematic pseuoinverse
-  Eigen::MatrixXd J_transpose_pinv;
-  pseudoInverse(J.transpose(), J_transpose_pinv);
+  Eigen::MatrixXd jacobian_transpose_pinv;
+  pseudoInverse(jacobian.transpose(), jacobian_transpose_pinv);
   
-  
-// Force Position Control Paper: Force Control of Redudant Robots
+// //////////////////////////  Force Control IEEE Paper //////////////////////////////////////
+// // External force on TCP
 
-  Lambda << (J * B.inverse() * J.transpose()).inverse();
-  
-  J_plus << B.inverse() * J.transpose() * Lambda;
-  
-  J_T_plus << Lambda * J * B.inverse();
-  
-  tau_0 << (nullspace_stiffness_ * (q_d_nullspace_ - q) -
-                        (2.0 * sqrt(nullspace_stiffness_)) * dq);
-  
-  tau_task << J.transpose() * (/*Lambda * */(S_P * (/*dderror +*/ K_D * derror + K_P * error) 
-  /*+ S_F*(K_f * (F - F_d) + K_w * dF) - dJ * dq) + F*/  )) 
-  + C + (I - J.transpose() * J_T_plus) * tau_0;
+//   f << D_d * derror + K_d * error;  
+//   
+//   M_r << (jacobian * mass.inverse() * jacobian.transpose()).inverse();
+//   
+//   tau_task << jacobian.transpose() * M_r * (M_d.inverse() * (D_d * derror + K_d * error)
+//             + jacobian * mass.inverse() * (coriolis /*+ gravity*/) - djacobian * dq) 
+//             + jacobian.transpose() * (I - M_r * M_d.inverse()) * f;
   
   
-// Force Control
-// External force on TCP: Paper : IEEE 1999 Spatial Impedance Control
+//  ////////////////////////////////   Force Position Control Paper: Force Control of Redudant Robots  /////////////////////////////////////////
 
-//   f.head(3) << D_d * derror + K_d * error; 
+//   Lambda << (jacobian * mass.inverse() * jacobian.transpose()).inverse();
 //   
-//   J_inverse << B.inverse() * J.transpose() * (J * B.inverse() * J.transpose()).inverse();
+//   J_plus << mass.inverse() * jacobian.transpose() * Lambda;
 //   
-//   vec << 0, 0, (q(2) - -1.571), 0, 0, 0, 0;
+//   J_T_plus << Lambda * jacobian * mass.inverse();
 //   
-//   gamma << 1 * B.inverse() * vec;
+//   tau_0 << (nullspace_stiffness_ * (q_d_nullspace_ - q) -
+//                         (2.0 * sqrt(nullspace_stiffness_)) * dq);
 //   
-//   dgamma << (gamma - gamma_prev) / period.toSec();
+//   tau_task << jacobian.transpose() * (Lambda * (S_P * (dderror + K_D * derror + K_P * error)
+//    /*+ S_F*(K_f * (F - F_d) + K_w * dF) - dJ * dq) + F*/  )) 
+//   /*+ coriolis + (I - J.transpose() * J_transpose_pinv) * tau_0*/ ;
 //   
-//   e_n << (I - J_inverse * J) * (gamma - dq);
-//   
-//   dJ_inverse << (J_inverse - J_inverse_prev) / period.toSec();
-//   
-//   Phi << (I - J_inverse * J) * (dgamma - dJ_inverse * J * (gamma - dq) + B.inverse() * (K_n * e_n + C));
-//   
-//   tau_task << B * (J_inverse * (Eigen::MatrixXd::Zero(6, 1) - dJ * dq) + Phi) + C /*+ g*/ + J.transpose() * f;
-   
   
-//   // PID controller
-//   eint << eint + error * period.toSec();
-//   
-//   
-//   // Cartesian PID control with damping ratio = 1
-//   tau_task << J.transpose() * (-K_P * error -K_D * derror -K_I * eint);
+  ////////////////////////////////////        PID controller     /////////////////////////////////////////
+  
+  eint << eint + error * period.toSec();
+  
+  
+  // Cartesian PID control
+  tau_task << jacobian.transpose() * (-K_P * error -K_D * derror -K_I * eint);
+  
+  
   
  std::cout << "Error" <<std::endl<< error <<std::endl; 
      
   // nullspace PD control with damping ratio = 1
   tau_nullspace << (Eigen::MatrixXd::Identity(7, 7) -
-                    J.transpose() * J_transpose_pinv) *
+                    jacobian.transpose() * jacobian_transpose_pinv) *
                        (nullspace_stiffness_ * (q_d_nullspace_ - q) -
                         (2.0 * sqrt(nullspace_stiffness_)) * dq);
                        
                        
   // Desired torque
-  tau_d << tau_task;
+  tau_d << tau_task + coriolis + tau_nullspace;
   
   
   // Saturate torque rate to avoid discontinuities
@@ -326,10 +312,9 @@ void MyImpedanceController::update(const ros::Time& time, const ros::Duration& p
   
   dq_prev << dq;
   dq_prev_prev << dq_prev;
-  J_prev << J;
-  J_prev_prev << J_prev;
-  gamma_prev << gamma;
-  J_inverse_prev << J_inverse;
+  jacobian_prev << jacobian;
+  jacobian_prev_prev << jacobian_prev;
+  
 
 //   // update parameters changed online either through dynamic reconfigure or through the interactive
 //   // target by filtering

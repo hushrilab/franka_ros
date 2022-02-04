@@ -113,19 +113,34 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
   
 //   For Impedance Controller
   
-  K_p.setIdentity(); // set stiffness matrix to zero
-  K_d.setIdentity(); // set damping matrix to zero
-  M_d.setIdentity(); // set damping matrix to zero
+  K_p.setIdentity(); 
+  K_d.setIdentity(); 
+  M_d.setIdentity(); 
+  
   S_P.setIdentity();
-  F_ext.setZero();
- 
+  
   M_d.diagonal() << 0.5, 0.5, 0.5, 0.5, 0.5, 0.5;
-  K_p.diagonal() << 50, 50, 50, 150, 150, 150;  // for qauterionen error with franka last three digits 150,150,150
+  K_p.diagonal() << 350, 350, 350, 200, 200, 200;  // 50, 50, 50, 150, 150, 150;
   K_d.diagonal() << 20, 20, 20, 30, 30, 30;
   
   // Nullspace stiffness and damping
-  K_N.diagonal() << 15, 15, 15, 15, 15, 15, 15;
-  D_N.diagonal() << 4, 4, 4, 4, 4, 4, 4;
+  K_N.setIdentity();
+  D_N.setIdentity();
+  K_N << K_N * 15;
+  D_N << D_N * sqrt(15);
+// //      K_N.diagonal() << 15, 15, 15, 15, 15, 15, 15;
+// //      D_N << D_N * - 0.5 * sqrt(15);
+  
+  // For optimal damping (Does not work yet)
+//   D_eta.setIdentity();
+//   D_eta << D_eta * 0.7;
+//   D_eta(6,6) = 0;
+//   K_p0.diagonal() << 3500, 3500, 3500, 0.200, 0.200, 0.200, 0;
+  
+  
+  // To check max values
+  ddq_max << 15, 7.5, 10, 12.5, 15, 20, 20;
+  tau_max << 87, 87, 87, 87, 12, 12, 12;
   
   return true;
 }
@@ -142,6 +157,8 @@ void HenningImpedanceController::starting(const ros::Time& /*time*/) {
   jacobian_prev << jacobian;
   
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(initial_state.dq.data());
+  dq_prev << dq;
+  ddq_filtered << dq;
   
   // convert to eigen
   Eigen::Map<Eigen::Matrix<double, 7, 1>> q_initial(initial_state.q.data());
@@ -150,15 +167,16 @@ void HenningImpedanceController::starting(const ros::Time& /*time*/) {
   // set equilibrium point to current state
   position_d = initial_transform.translation();
   orientation_d = Eigen::Quaterniond(initial_transform.linear());
-  Eigen::Vector3d curr_angles;
-  curr_angles << orientation_d.toRotationMatrix().eulerAngles(0, 1, 2);
-  std::cout<<std::endl<< "Angles" << std::endl << curr_angles << std::endl;
-  std::cout<<"Initial Orient" << std::endl<<orientation_d.coeffs()<<std::endl;
-    
-   
-//   position_d_target_ = initial_transform.translation();
-//   orientation_d_target_ = Eigen::Quaterniond(initial_transform.linear());
-
+  
+//   Eigen::Vector3d curr_angles;
+//   curr_angles << orientation_d.toRotationMatrix().eulerAngles(0, 1, 2);
+//   std::cout<<std::endl<< "Angles" << std::endl << curr_angles << std::endl;
+//   std::cout<<"Initial Orient" << std::endl<<orientation_d.coeffs()<<std::endl;
+  
+  Eigen::Map<Eigen::Matrix<double, 6, 1>> F_ext(initial_state.O_F_ext_hat_K.data());
+  F_ext_prev << F_ext;
+  F_ext_filtered << F_ext;
+  
   // set nullspace equilibrium configuration to initial q
   q_d_nullspace_ = q_initial;
 }
@@ -180,9 +198,21 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   Eigen::Map<Eigen::Matrix<double, 7, 1>> gravity(gravity_array.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> q(robot_state.q.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(robot_state.dq.data());
-  
+  Eigen::Map<Eigen::Matrix<double, 6, 1>> F_ext(robot_state.O_F_ext_hat_K.data());
   
   djacobian << (jacobian - jacobian_prev) / period.toSec();
+  ddq << (dq - dq_prev) / period.toSec();
+//   ddq << ((dq_prev - dq_prev_prev) / period.toSec() + (dq - dq_prev) / period.toSec()) / 2;
+  
+  // Filter signals
+  
+  Eigen::MatrixXd y(7,7);
+  Filter(0.001, F_ext.rows(), F_ext.cols(), F_ext, F_ext_prev, F_ext_filtered, y);
+  F_ext_filtered << y;
+  
+  Filter(0.001, ddq.rows(), ddq.cols(), ddq, ddq_prev, ddq_filtered, y);
+  ddq_filtered << y;
+
   
   Eigen::Map<Eigen::Matrix<double, 7, 1>> tau_J_d(  // NOLINT (readability-identifier-naming)
       robot_state.tau_J_d.data());
@@ -197,12 +227,12 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   curr_velocity << jacobian * dq;
   
   Eigen::VectorXd curr_acceleration(6);
-  curr_acceleration << jacobian * ddq + djacobian * dq;
+  curr_acceleration << jacobian * ddq_filtered + djacobian * dq;
   
   //desired position and velocity
   
-//   // Circular Motion
-//   
+  // Circular Motion
+  
 //   position_d <<  r * cos(omega * time.toSec()) + 0.55 - r,
 //                  r * sin(omega * time.toSec()), 
 //                  0.52;
@@ -223,14 +253,14 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   
   acceleration_d.setZero();
   
-  position_d <<  0.5 + velocity_d(0) * time.toSec() + 0.5 * acceleration_d(0) * time.toSec() * time.toSec(),
-                   0 + velocity_d(1) * time.toSec() + 0.5 * acceleration_d(1) * time.toSec() * time.toSec(), 
-                 0.5 + velocity_d(2) * time.toSec() + 0.5 * acceleration_d(2) * time.toSec() * time.toSec();
+  position_d << 0.55 + velocity_d(0) * time.toSec() + 0.5 * acceleration_d(0) * time.toSec() * time.toSec(),
+                0   + velocity_d(1) * time.toSec() + 0.5 * acceleration_d(1) * time.toSec() * time.toSec(), 
+                0.52 + velocity_d(2) * time.toSec() + 0.5 * acceleration_d(2) * time.toSec() * time.toSec();
   
   
  // Orientation  
                  
-  omega_d_local << 0 , 0, 1;          // in hand coordinate system
+  omega_d_local << 0, 0, 0;          // in hand coordinate system
   omega_d_global << transform.linear() * omega_d_local;
   
   domega_d_local.setZero();          // in hand coordinate system
@@ -238,8 +268,8 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 
   
   alpha = 0 + omega_d_global(0) * time.toSec() + 0.5 * domega_d_global(0) * time.toSec() * time.toSec();    // x-axis (roll)
-  beta  = 0 + omega_d_global(1) * time.toSec() + 0.5 * domega_d_global(1) * time.toSec() * time.toSec();;   // y-axis (pitch)
-  gamma = 0 + omega_d_global(2) * time.toSec() + 0.5 * domega_d_global(2) * time.toSec() * time.toSec();;   // z-axis (yaw) compared to base frame in intial position
+  beta  = 0 + omega_d_global(1) * time.toSec() + 0.5 * domega_d_global(1) * time.toSec() * time.toSec();   // y-axis (pitch)
+  gamma = 0 + omega_d_global(2) * time.toSec() + 0.5 * domega_d_global(2) * time.toSec() * time.toSec();   // z-axis (yaw) compared to base frame in intial position
   
   angles_d <<  M_PI + M_PI/180 * alpha, 
                     + M_PI/180 * beta,
@@ -318,7 +348,7 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   
   // !!!!!!!!!!!!!!!!!!!!!!!!! Does not work !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! //
   
-// // External force on TCP
+// External force on TCP
 
 //   f << D_d * derror + K_d * error;  
 //   
@@ -353,11 +383,20 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 // ///////////////////  Paper: Cartesian Impedance Control of Redundant Robots:       /////////////////////////
 // //////////////////          Recent Results with the DLR-Light-Weight-Arms, DLR    /////////////////////////
  
-  
+//   std::cout <<"External Force:"<<std::endl<< F_ext_filtered <<std::endl;
+//   F_ext.setZero();
 
   Lambda << (jacobian * mass.inverse() * jacobian.transpose()).inverse();
+  
+//                 //   // Find best damping matrix
+//                   Eigen::MatrixXd Q = Lambda.llt().matrixL();
+//                 
+//                   K_d << 2 * Q * D_eta * K_p0 * Q.transpose();
+//                   K_p << Q * K_p0 * Q.transpose();
+//                   
+//                   std::cout << "K_P0" << K_p0.pow(0.5) <<std::endl;
    
-  F_tau = Lambda * ddx - Lambda * M_d.inverse() * (K_d * derror + K_p * error) + (Lambda * M_d.inverse() - I) * F_ext - Lambda * djacobian * dq;
+  F_tau = Lambda * ddx - Lambda * M_d.inverse() * (K_d * derror + K_p * error) + (Lambda * M_d.inverse() - I) * F_ext_filtered - Lambda * djacobian * dq;
    
   tau_task = jacobian.transpose() * F_tau;
   
@@ -402,9 +441,25 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
     joint_handles_[i].setCommand(tau_d(i));
   }
   
-   std::cout << "Error" <<std::endl<< error <<std::endl; 
+//    std::cout << "Error" <<std::endl<< error <<std::endl; 
+
+// Compare all values
+
+for (size_t i = 0; i < 7; ++i) {
+    if (tau_d[i] > tau_max[i]) {
+        std::cout << "Error:Eigen::Matrix<double,6, 1> Torque at joint: "<< i<<" is too big!!"<<std::endl;
+    }
+    if (ddq_filtered[i] > ddq_max[i]) {
+        // Acceleration very noisy
+        std::cout << "Error: ddq at joint: "<< i<<" is too big!! ("<<ddq_filtered[i]<<" m/s^2)"<<std::endl;
+    }
+  }
 
   jacobian_prev << jacobian;
+  F_ext_prev << F_ext;
+  ddq_prev << ddq;
+  dq_prev << dq;
+
 
 }
 
@@ -418,6 +473,13 @@ Eigen::Matrix<double, 7, 1> HenningImpedanceController::saturateTorqueRate(
         tau_J_d[i] + std::max(std::min(difference, delta_tau_max_), -delta_tau_max_);
   }
   return tau_d_saturated;
+}
+  
+  void HenningImpedanceController::Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input, 
+  const Eigen::MatrixXd& input_prev,  const Eigen::MatrixXd& y_prev,   Eigen::MatrixXd& y) {
+        
+  y.resize(rows,cols);
+  y << (1 - filter_param) * y_prev + filter_param * (input + input_prev) / 2;
 }
 
 }  // namespace franka_example_controllers
