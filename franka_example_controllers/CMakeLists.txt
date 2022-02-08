@@ -29,6 +29,10 @@ find_package(Franka 0.7.0 REQUIRED)
 find_package(mc_rtc 1.3.0 REQUIRED)
 include_directories(${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIR})
 
+# Find OSQP library and headers
+find_package(osqp REQUIRED)
+find_package(OsqpEigen REQUIRED)
+
 add_message_files(FILES
   JointTorqueComparison.msg
 )
@@ -95,6 +99,11 @@ target_link_libraries(franka_example_controllers PUBLIC
   # added for mc_rtc
   mc_rtc::mc_control 
   mc_rtc::mc_rtc_ros
+  OsqpEigen::OsqpEigen
+
+  # Link the OSQP shared library
+  osqp::osqp
+  
 )
 
 target_include_directories(franka_example_controllers SYSTEM PUBLIC

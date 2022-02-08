@@ -46,7 +46,7 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   std::vector<hardware_interface::JointHandle> joint_handles_;
   
   // for trajectory
-  double r {0.2};
+  double r {0.1};
   double omega {1};
   
   double filter_params_{0.005};
@@ -74,6 +74,7 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   Eigen::Matrix<double, 6, 6> S_f;
   Eigen::Matrix<double, 7, 1> tau_0;
 //   Eigen::Matrix<double, 7, 7> I;
+  Eigen::Matrix<double, 7, 6> J_dash;
   
   
   Eigen::Matrix<double, 6, 6> K_p;
@@ -93,7 +94,9 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   Eigen::Matrix<double, 7, 1> dq_prev;
   Eigen::Matrix<double, 7, 1> ddq;
   Eigen::Matrix<double, 7, 1> ddq_max;
+  Eigen::Matrix<double, 7, 1> dq_max;
   Eigen::Matrix<double, 7, 1> tau_max;
+  Eigen::Matrix<double, 7, 1> tau_min;
 
   
   // For filtering
@@ -106,10 +109,15 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   double alpha, beta, gamma; // in degrees
   
   Eigen::Vector3d position_d;
+  Eigen::Vector3d position_d_target;
+  Eigen::Vector3d position_init;
   Eigen::Vector3d angles_d;
+  Eigen::Vector3d angles_init;
   Eigen::Vector3d velocity_d;
   Eigen::Vector3d acceleration_d;
   Eigen::Quaterniond orientation_d;
+  Eigen::Quaterniond orientation_init;
+  Eigen::Quaterniond orientation_d_target;
   Eigen::Vector3d omega_d_local;
   Eigen::Vector3d omega_d_global;
   Eigen::Vector3d domega_d_local;
