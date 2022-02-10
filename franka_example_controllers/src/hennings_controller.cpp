@@ -12,8 +12,9 @@
 
 #include <franka_example_controllers/pseudo_inversion.h>
 
-#include "osqp.h"
 #include "OsqpEigen/OsqpEigen.h"
+ 
+#include <qpmad/solver.h>
 
 namespace franka_example_controllers {
 
@@ -123,7 +124,7 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
   S_P.setIdentity();
   
   M_d.diagonal() << 0.5, 0.5, 0.5, 0.5, 0.5, 0.5;
-  K_p.diagonal() << 350, 350, 350, 200, 200, 200;  // 50, 50, 50, 150, 150, 150;
+  K_p.diagonal() << 350, 350, 350, 200, 200, 200;
   K_d.diagonal() << 20, 20, 20, 30, 30, 30;
   
   // Nullspace stiffness and damping
@@ -205,6 +206,9 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(robot_state.dq.data());
   Eigen::Map<Eigen::Matrix<double, 6, 1>> F_ext(robot_state.O_F_ext_hat_K.data());
   
+  Eigen::Matrix<double, 7, 7> mass_inv;
+  mass_inv << mass.inverse();
+  
   djacobian << (jacobian - jacobian_prev) / period.toSec();
   ddq << (dq - dq_prev) / period.toSec();
   
@@ -237,7 +241,7 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 
 //  // Point to Point movements
 
-  position_d_target << -0.2,
+  position_d_target << 0.4,
                        0,
                        0.5;
   
@@ -264,7 +268,7 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 //                 position_init(1) + velocity_d(1) * time.toSec() + 0.5 * acceleration_d(1) * time.toSec() * time.toSec(), 
 //                 position_init(2) + velocity_d(2) * time.toSec() + 0.5 * acceleration_d(2) * time.toSec() * time.toSec();
   
-//  // Circular Motion
+ // Circular Motion
   
 //   position_d <<  r * cos(omega * time.toSec()) + position_init(0) - r,
 //                  r * sin(omega * time.toSec()) + position_init(1), 
@@ -315,24 +319,6 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
     curr_orientation.coeffs() << -curr_orientation.coeffs();
   }
   
-  // difference between quaternions
-  
-//  // orientation Error According to Silciano
-//   
-//   Eigen::Vector3d quat_d, quat_c;
-//   
-//   quat_d << orientation_d.x(),
-//             orientation_d.y(),
-//             orientation_d.z();
-//             
-//   quat_c << curr_orientation.x(),
-//             curr_orientation.y(),
-//             curr_orientation.z();
-//   
-//   error.tail(3) << curr_orientation.w() * quat_d - orientation_d.w() * quat_c - quat_d.cross(quat_c);
-  
-  // Orientation Error according to Franka Emika (the same when cross Product of Silciano is quat_c.cross(quat_d))
-  
   Eigen::Quaterniond error_quaternion(curr_orientation.inverse() * orientation_d);
   error.tail(3) << error_quaternion.x(), error_quaternion.y(), error_quaternion.z();
   
@@ -356,26 +342,6 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   Eigen::VectorXd tau_task(7), tau_nullspace(7), tau_d(7);
   
   
-//  //////////////////    Paper: Force Control of Redudant Robots, Bojan Nemec, 1997  /////////////////////
-  
-  
-//   Lambda << (jacobian * mass.inverse() * jacobian.transpose()).inverse();
-//   
-// //   J_plus << mass.inverse() * jacobian.transpose() * Lambda;
-//   
-//   J_T_plus << Lambda * jacobian * mass.inverse();
-//   
-//   tau_0 << (nullspace_stiffness_ * (q_d_nullspace_ - q) -
-//                         (2.0 * sqrt(nullspace_stiffness_)) * dq);
-//   
-//   tau_task << jacobian.transpose() * (Lambda * (S_P * (ddx - K_p * error - K_d * derror)
-//   /*+ S_F*(K_f * (F - F_d) + K_w * dF)*/ - djacobian * dq )) 
-//   + coriolis + (Eigen::MatrixXd::Identity(7, 7) - jacobian.transpose() * J_T_plus) * tau_0;
-//   
-//  // Desired torque
-//  tau_d << tau_task;
-  
-  
 // ///////////////////  Paper: Cartesian Impedance Control of Redundant Robots:       /////////////////////////
 // //////////////////          Recent Results with the DLR-Light-Weight-Arms, DLR    /////////////////////////
   
@@ -385,7 +351,7 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 // //   std::cout <<"External Force:"<<std::endl<< F_ext_filtered <<std::endl;
 //   F_ext_filtered.setZero();
 // 
-//   Lambda << (jacobian * mass.inverse() * jacobian.transpose()).inverse();
+//   Lambda << (jacobian * mass_inv * jacobian.transpose()).inverse();
 //   
 // //                 //   // Find best damping matrix
 // //                   Eigen::MatrixXd Q = Lambda.llt().matrixL();
@@ -403,7 +369,7 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 //  
 //   tau_nullspace << -K_N * (q - q_nullspace) - D_N * dq;
 //      
-//   N << Eigen::MatrixXd::Identity(7, 7) - jacobian.transpose() * Lambda * jacobian * mass.inverse();
+//   N << Eigen::MatrixXd::Identity(7, 7) - jacobian.transpose() * Lambda * jacobian * mass_inv;
 //   
 //   // Desired torque
 //   tau_d << tau_task + coriolis + N * tau_nullspace;
@@ -415,35 +381,26 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   
 // // Comment: Robot is getting instable
   
-  Lambda << (jacobian * mass.inverse() * jacobian.transpose()).inverse();
-  J_dash << mass.inverse() * jacobian.transpose() * Lambda;
-//     
-//   tau_nullspace << -K_N * (q - q_nullspace) - D_N * dq;
-//   
-//   
-//   tau_task << jacobian.transpose() * Lambda * (ddx - K_p * error - K_d * derror) 
-//               + (Eigen::MatrixXd::Identity(7, 7) - jacobian.transpose() * J_dash.transpose()) * tau_nullspace;
-//               
-//   
-//  // Desired torque
-//  tau_d << tau_task + coriolis;
+  Lambda << (jacobian * mass_inv * jacobian.transpose()).inverse();
   
-
+  J_dash << mass_inv * jacobian.transpose() * Lambda;  
   
-    Eigen::Matrix<double,7,7> H;
-    Eigen::Matrix<double,6,7> Q;
+  f << - K_p * error - K_d * derror;
+// osqp Eigen
+  
+    Eigen::Matrix<double, 7, 7> Hessian;
+    Eigen::Matrix<double, 6, 7> Q;
     
+    Q << jacobian * mass_inv;
 //     Q << J_dash.transpose();
-    Q << jacobian * mass.inverse();
-    
-    H << Q.transpose() * Q;
 
+    Hessian << Q.transpose() * Q;  // this is mass_inv * jacobian.transpose() * jacobian * mass_inv
         
     Eigen::SparseMatrix<double> H_s(7,7);
     
     for (int i = 0; i < 7; i++){
         for (int j = 0; j < 7; j++){
-            H_s.insert(i,j) = H(i,j);
+            H_s.insert(i,j) = Hessian(i,j);
         }
     }
     
@@ -452,14 +409,22 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 
     Eigen::VectorXd gradient(7);
     
-//     gradient << - Q.transpose() * (- K_p * error - K_d * derror);
-    gradient << - Q.transpose() * jacobian * mass.inverse() * jacobian.transpose() * (- K_p * error - K_d * derror);
+//     gradient << - Q.transpose() * f;
+     gradient << - Q.transpose() * jacobian * mass_inv * jacobian.transpose() * f;
+//     gradient << -f.transpose() * J_dash.transpose();
+    
+  // TODO check how Nullspace handling in quadratic programming works
+  
+    tau_nullspace << -K_N * (q - q_nullspace) - D_N * dq;
+     
+    N << Eigen::MatrixXd::Identity(7, 7) - jacobian.transpose() * Lambda * jacobian * mass_inv;
+    
     
     Eigen::VectorXd lowerBound(7);
-    lowerBound << tau_min - coriolis;
+    lowerBound << tau_min /*- coriolis - N * tau_nullspace*/;
 
     Eigen::VectorXd upperBound(7);
-    upperBound << tau_max - coriolis;
+    upperBound << tau_max /*- coriolis - N * tau_nullspace*/;
 
     OsqpEigen::Solver solver;
     solver.settings()->setVerbosity(true);
@@ -478,20 +443,12 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 
 //     solver.solveProblem() == OsqpEigen::ErrorExitFlag::NoError;
 
-    tau_d = solver.getSolution(); 
+    tau_task = solver.getSolution(); 
+    
+    
   
-  
-  
-
-// Least Squares  
-//   Eigen::Matrix<double, 6, 7> A;
-//   Eigen::Matrix<double, 6, 1> b;
-//   
-//   A << jacobian * mass.inverse();
-//   b << jacobian * mass.inverse() * jacobian.transpose() *  (- K_p * error - K_d * derror);
-//   
-//   tau_d << A.colPivHouseholderQr().solve(b) + coriolis;
-//  
+  // Desired torque
+    tau_d << tau_task /*+ coriolis*/;
   
 //  ////////////////////////////////////      PID controller     /////////////////////////////////////////
   
@@ -532,11 +489,9 @@ for (size_t i = 0; i < 7; ++i) {
         std::cout << "Error: Torque at joint: "<< i <<" is too big!! ("<< tau_d[i] <<" Nm)"<<std::endl;
     }
     if (std::abs(ddq_filtered[i]) > ddq_max[i]) {
-        // Acceleration very noisy
         std::cout << "Error: ddq at joint: "<< i <<" is too big!! ("<< ddq_filtered[i] <<" m/s^2)"<<std::endl;
     }
     if (std::abs(dq[i]) > dq_max[i]) {
-        // Acceleration very noisy
         std::cout << "Error: dq at joint: "<< i <<" is too big!! ("<< dq[i] <<" m/s^2)"<<std::endl;
     }
   }

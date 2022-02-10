@@ -33,6 +33,8 @@ include_directories(${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIR})
 find_package(osqp REQUIRED)
 find_package(OsqpEigen REQUIRED)
 
+find_package(qpmad REQUIRED)
+
 add_message_files(FILES
   JointTorqueComparison.msg
 )
@@ -99,10 +101,12 @@ target_link_libraries(franka_example_controllers PUBLIC
   # added for mc_rtc
   mc_rtc::mc_control 
   mc_rtc::mc_rtc_ros
-  OsqpEigen::OsqpEigen
+
 
   # Link the OSQP shared library
   osqp::osqp
+  OsqpEigen::OsqpEigen
+  ${qpmad_LIBRARIES}
   
 )
 

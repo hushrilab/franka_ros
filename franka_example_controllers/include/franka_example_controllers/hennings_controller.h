@@ -73,9 +73,8 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   Eigen::Matrix<double, 6, 6> S_P;
   Eigen::Matrix<double, 6, 6> S_f;
   Eigen::Matrix<double, 7, 1> tau_0;
-//   Eigen::Matrix<double, 7, 7> I;
   Eigen::Matrix<double, 7, 6> J_dash;
-  
+  Eigen::Matrix<double, 6, 1> f;
   
   Eigen::Matrix<double, 6, 6> K_p;
   Eigen::Matrix<double, 6, 6> K_d;
@@ -97,6 +96,7 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   Eigen::Matrix<double, 7, 1> dq_max;
   Eigen::Matrix<double, 7, 1> tau_max;
   Eigen::Matrix<double, 7, 1> tau_min;
+  
 
   
   // For filtering
