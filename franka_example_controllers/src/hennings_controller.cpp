@@ -13,8 +13,7 @@
 #include <franka_example_controllers/pseudo_inversion.h>
 
 #include "OsqpEigen/OsqpEigen.h"
- 
-#include <qpmad/solver.h>
+
 
 namespace franka_example_controllers {
 
@@ -125,15 +124,14 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
   
   M_d.diagonal() << 0.5, 0.5, 0.5, 0.5, 0.5, 0.5;
   K_p.diagonal() << 350, 350, 350, 200, 200, 200;
+//     K_p.diagonal() << 35, 35, 35, 20, 20, 20;  // works better for osqp eigen
   K_d.diagonal() << 20, 20, 20, 30, 30, 30;
   
   // Nullspace stiffness and damping
   K_N.setIdentity();
   D_N.setIdentity();
-  K_N << K_N * 15;
-  D_N << D_N * sqrt(15);
-// //      K_N.diagonal() << 15, 15, 15, 15, 15, 15, 15;
-// //      D_N << D_N * - 0.5 * sqrt(15);
+  K_N << K_N * 30;
+  D_N << D_N * 0.5 * sqrt(K_N(0,0));
   
   // For optimal damping (Does not work yet)
 //   D_eta.setIdentity();
@@ -241,13 +239,13 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 
 //  // Point to Point movements
 
-  position_d_target << 0.4,
-                       0,
+  position_d_target << 0,
+                       0.4,
                        0.5;
   
   angles_d <<  0  * M_PI/180 + M_PI,  // x-axis (roll)
                0  * M_PI/180,         // y-axis (pitch)
-               0  * M_PI/180;         // z-axis (yaw) compared to base frame in intial position
+               -90  * M_PI/180;         // z-axis (yaw) compared to base frame in intial position
 
   orientation_d_target =    Eigen::AngleAxisd(angles_d(0), Eigen::Vector3d::UnitX())
                           * Eigen::AngleAxisd(angles_d(1), Eigen::Vector3d::UnitY())
@@ -381,74 +379,96 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   
 // // Comment: Robot is getting instable
   
-  Lambda << (jacobian * mass_inv * jacobian.transpose()).inverse();
+//   Lambda << (jacobian * mass_inv * jacobian.transpose()).inverse();
+//   
+//   J_dash << mass_inv * jacobian.transpose() * Lambda;  
+//   
+//   f << - K_p * error - K_d * derror;
+// // osqp Eigen
+//   
+//     Eigen::Matrix<double, 7, 7> Hessian;
+//     Eigen::Matrix<double, 6, 7> Q;
+//     
+//     Q << jacobian * mass_inv;
+// //     Q << J_dash.transpose();
+// 
+//     Hessian << Q.transpose() * Q;  // this is mass_inv * jacobian.transpose() * jacobian * mass_inv
+//         
+//     Eigen::SparseMatrix<double> H_s(7,7);
+//     
+//     for (int i = 0; i < 7; i++){
+//         for (int j = 0; j < 7; j++){
+//             H_s.insert(i,j) = Hessian(i,j);
+//         }
+//     }
+//     
+//     Eigen::SparseMatrix<double> A_s(7,7);
+//     A_s.setIdentity();
+// 
+//     Eigen::VectorXd gradient(7);
+//     
+// //     gradient << - Q.transpose() * f;
+//      gradient << - Q.transpose() * jacobian * mass_inv * jacobian.transpose() * f;
+// //     gradient << -f.transpose() * J_dash.transpose();
+//     
+//   // TODO check how Nullspace handling in quadratic programming works
+//   
+//     tau_nullspace << -K_N * (q - q_nullspace) - D_N * dq;
+//      
+//     N << Eigen::MatrixXd::Identity(7, 7) - jacobian.transpose() * Lambda * jacobian * mass_inv;
+//     
+//     
+//     Eigen::VectorXd lowerBound(7);
+//     lowerBound << tau_min - coriolis /*- N * tau_nullspace*/;
+// 
+//     Eigen::VectorXd upperBound(7);
+//     upperBound << tau_max - coriolis /*- N * tau_nullspace*/;
+// 
+//     OsqpEigen::Solver solver;
+//     solver.settings()->setVerbosity(true);
+//     solver.settings()->setAlpha(1.0);
+// 
+//     solver.data()->setHessianMatrix(H_s);
+//     solver.data()->setNumberOfVariables(7);
+// 
+//     solver.data()->setNumberOfConstraints(7);
+//     solver.data()->setHessianMatrix(H_s);
+//     solver.data()->setGradient(gradient);
+//     solver.data()->setLinearConstraintsMatrix(A_s);
+//     solver.data()->setLowerBound(lowerBound);
+//     solver.data()->setUpperBound(upperBound);
+//     solver.initSolver();
+// 
+//     solver.solveProblem();
+// 
+//     tau_task = solver.getSolution(); 
+//   
+//   // Desired torque
+//     tau_d << tau_task + coriolis;
+    
+    
+// ///////////////////  Paper: Multiple priority impedance control       /////////////////////////
   
-  J_dash << mass_inv * jacobian.transpose() * Lambda;  
+// // Comment:
   
-  f << - K_p * error - K_d * derror;
-// osqp Eigen
+  F_ext_filtered.setZero();
   
-    Eigen::Matrix<double, 7, 7> Hessian;
-    Eigen::Matrix<double, 6, 7> Q;
-    
-    Q << jacobian * mass_inv;
-//     Q << J_dash.transpose();
-
-    Hessian << Q.transpose() * Q;  // this is mass_inv * jacobian.transpose() * jacobian * mass_inv
-        
-    Eigen::SparseMatrix<double> H_s(7,7);
-    
-    for (int i = 0; i < 7; i++){
-        for (int j = 0; j < 7; j++){
-            H_s.insert(i,j) = Hessian(i,j);
-        }
-    }
-    
-    Eigen::SparseMatrix<double> A_s(7,7);
-    A_s.setIdentity();
-
-    Eigen::VectorXd gradient(7);
-    
-//     gradient << - Q.transpose() * f;
-     gradient << - Q.transpose() * jacobian * mass_inv * jacobian.transpose() * f;
-//     gradient << -f.transpose() * J_dash.transpose();
-    
-  // TODO check how Nullspace handling in quadratic programming works
+  Eigen::MatrixXd J_W(7,6) , W(7,7), N_W(7,7);
   
-    tau_nullspace << -K_N * (q - q_nullspace) - D_N * dq;
-     
-    N << Eigen::MatrixXd::Identity(7, 7) - jacobian.transpose() * Lambda * jacobian * mass_inv;
-    
-    
-    Eigen::VectorXd lowerBound(7);
-    lowerBound << tau_min /*- coriolis - N * tau_nullspace*/;
-
-    Eigen::VectorXd upperBound(7);
-    upperBound << tau_max /*- coriolis - N * tau_nullspace*/;
-
-    OsqpEigen::Solver solver;
-    solver.settings()->setVerbosity(true);
-    solver.settings()->setAlpha(1.0);
-
-    solver.data()->setHessianMatrix(H_s);
-    solver.data()->setNumberOfVariables(7);
-
-    solver.data()->setNumberOfConstraints(7);
-    solver.data()->setHessianMatrix(H_s);
-    solver.data()->setGradient(gradient);
-    solver.data()->setLinearConstraintsMatrix(A_s);
-    solver.data()->setLowerBound(lowerBound);
-    solver.data()->setUpperBound(upperBound);
-    solver.initSolver();
-
-//     solver.solveProblem() == OsqpEigen::ErrorExitFlag::NoError;
-
-    tau_task = solver.getSolution(); 
-    
-    
+  W.setIdentity();
+  
+  J_W << W.inverse() * jacobian.transpose() * (jacobian * W.inverse() * jacobian.transpose()).inverse();
+  
+  N_W << Eigen::MatrixXd::Identity(7, 7) - J_W * jacobian;
+  
+  tau_nullspace << K_N * (q - q_nullspace) + D_N * dq;
+  
+  tau_task = mass * J_W *(ddx + M_d.inverse() * (F_ext_filtered - K_d * derror - K_p * error) - djacobian * dq) + mass * N_W * M_d.inverse() * (-tau_nullspace);
   
   // Desired torque
-    tau_d << tau_task /*+ coriolis*/;
+  tau_d << tau_task + coriolis;
+  
+  q_nullspace << q;
   
 //  ////////////////////////////////////      PID controller     /////////////////////////////////////////
   
