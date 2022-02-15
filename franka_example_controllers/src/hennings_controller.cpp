@@ -10,10 +10,10 @@
 #include <pluginlib/class_list_macros.h>
 #include <ros/ros.h>
 
-#include <franka_example_controllers/pseudo_inversion.h>
+// #include <franka_example_controllers/pseudo_inversion.h>
 
 #include "OsqpEigen/OsqpEigen.h"
-
+#include "qpOASES.hpp"
 
 namespace franka_example_controllers {
 
@@ -239,13 +239,13 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 
 //  // Point to Point movements
 
-  position_d_target << 0,
-                       0.4,
-                       0.5;
+  position_d_target << 0.3,
+                       0,
+                       0.6;
   
   angles_d <<  0  * M_PI/180 + M_PI,  // x-axis (roll)
                0  * M_PI/180,         // y-axis (pitch)
-               -90  * M_PI/180;         // z-axis (yaw) compared to base frame in intial position
+               0  * M_PI/180;         // z-axis (yaw) compared to base frame in intial position
 
   orientation_d_target =    Eigen::AngleAxisd(angles_d(0), Eigen::Vector3d::UnitX())
                           * Eigen::AngleAxisd(angles_d(1), Eigen::Vector3d::UnitY())
@@ -445,30 +445,140 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 //   
 //   // Desired torque
 //     tau_d << tau_task + coriolis;
+  
+  
+// // qpOASES 
+  f << - K_p * error - K_d * derror;
+  
+  Eigen::Matrix<double, 7, 7> Hessian;
+  Eigen::Matrix<double, 7, 7> Q1;
+  Eigen::Matrix<double, 6, 7> A2_;
+  Eigen::VectorXd c1(7), c2(7), b2_(6);
+  
+  Q1 << mass_inv * jacobian.transpose() * jacobian * mass_inv;
+    
+  c1 << - mass_inv * jacobian.transpose() * jacobian * mass_inv * jacobian.transpose() * f;
+
+  Eigen::VectorXd lowerBound(7);
+  lowerBound << tau_min - coriolis;
+
+  Eigen::VectorXd upperBound(7);
+  upperBound << tau_max - coriolis;
+ 
+  /* Setup data of first QP. */
+
+  qpOASES::real_t H[7*7];
+  int m = 0;
+  for (int i = 0; i < 7; i++) {
+      for (int j = 0; j < 7; j++){
+            H[m] = Q1(i,j);
+            m++;
+        }
+  }
+  
+  qpOASES::real_t g[7];
+  for (int i = 0; i < 7; i++) {
+       g[i] = c1(i);
+  }
+  
+  qpOASES::real_t lb[7];
+  for (int i = 0; i < 7; i++) {
+       lb[i] = lowerBound(i);
+  }
+  
+  qpOASES::real_t ub[7];
+  for (int i = 0; i < 7; i++) {
+       ub[i] = upperBound(i);
+  }
+
+  /* Setting up QProblem object. */
+	qpOASES::QProblemB QP1( 7 ); // Error is here!
+
+	qpOASES::Options options;
+	QP1.setOptions( options );
+
+	/* Solve first QP. */
+	qpOASES::int_t nWSR = 30;
+	QP1.init( H, g, lb, ub, nWSR, 0 );
+
+	/* Get and solution of first QP. */
+	qpOASES::real_t xOpt1[7];
+    
+	QP1.getPrimalSolution( xOpt1 );
+    
+  for (int i = 0; i < 7; i++) {
+       tau_task(i) = xOpt1[i];
+  }
+  
+
+  /* Setup data of second QP for Nullspace handling. */
+  tau_nullspace << -K_N * (q - q_nullspace) - D_N * dq;
+  
+  c2 << - mass_inv * jacobian.transpose() * jacobian * mass_inv * tau_nullspace;
+  
+  A2_ << jacobian * mass_inv;
+  b2_ << jacobian * mass_inv * tau_0;
+  
+  qpOASES::real_t g2[7];
+  for (int i = 0; i < 7; i++) {
+       g2[i] = c2(i);
+  }
+  
+  qpOASES::real_t A2[6*7];
+  m = 0;
+  for (int i = 0; i < 6; i++) {
+      for (int j = 0; j < 7; j++){
+            H[m] = A2_(i,j);
+            m++;
+        }
+  }
+  qpOASES::real_t b2[7];
+  for (int i = 0; i < 6; i++) {
+       g[i] = b2_(i);
+  }
+  
+/* Setting up QProblem object. */
+	qpOASES::QProblem QP2( 7,1 );
+
+	QP2.setOptions( options );
+
+	/* Solve first QP. */
+	QP2.init( H,g2,A2,lb,ub,b2,b2, nWSR, 0 );
+
+	/* Get and solution of first QP. */
+	qpOASES::real_t xOpt2[7];
+	QP2.getPrimalSolution( xOpt2 );
+    
+      for (int i = 0; i < 7; i++) {
+       tau_task(i) = xOpt2[i];
+  }
+  
+    tau_d << tau_task + coriolis;
     
     
 // ///////////////////  Paper: Multiple priority impedance control       /////////////////////////
+// ///////////////////                  Robert Platt Jr                  //////////////////////// 
   
-// // Comment:
-  
-  F_ext_filtered.setZero();
-  
-  Eigen::MatrixXd J_W(7,6) , W(7,7), N_W(7,7);
-  
-  W.setIdentity();
-  
-  J_W << W.inverse() * jacobian.transpose() * (jacobian * W.inverse() * jacobian.transpose()).inverse();
-  
-  N_W << Eigen::MatrixXd::Identity(7, 7) - J_W * jacobian;
-  
-  tau_nullspace << K_N * (q - q_nullspace) + D_N * dq;
-  
-  tau_task = mass * J_W *(ddx + M_d.inverse() * (F_ext_filtered - K_d * derror - K_p * error) - djacobian * dq) + mass * N_W * M_d.inverse() * (-tau_nullspace);
-  
-  // Desired torque
-  tau_d << tau_task + coriolis;
-  
-  q_nullspace << q;
+// // // Comment:
+//   
+//   F_ext_filtered.setZero();
+//   
+//   Eigen::MatrixXd J_W(7,6) , W(7,7), N_W(7,7);
+//   
+//   W.setIdentity();
+//   
+//   J_W << W.inverse() * jacobian.transpose() * (jacobian * W.inverse() * jacobian.transpose()).inverse();
+//   
+//   N_W << Eigen::MatrixXd::Identity(7, 7) - J_W * jacobian;
+//   
+//   tau_nullspace << K_N * (q - q_nullspace) + D_N * dq;
+//   
+//   tau_task = mass * J_W *(ddx + M_d.inverse() * (F_ext_filtered - K_d * derror - K_p * error) - djacobian * dq) + mass * N_W * M_d.inverse() * (-tau_nullspace);
+//   
+//   // Desired torque
+//   tau_d << tau_task + coriolis;
+//   
+//   q_nullspace << q;
   
 //  ////////////////////////////////////      PID controller     /////////////////////////////////////////
   
