@@ -33,7 +33,7 @@ include_directories(${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIR})
 find_package(osqp REQUIRED)
 find_package(OsqpEigen REQUIRED)
 
-find_package(qpOASES)
+find_package(qpOASES QUIET)
 
 # 
 # find_package(qpmad REQUIRED)
@@ -95,16 +95,29 @@ add_dependencies(franka_example_controllers
   ${PROJECT_NAME}_gencfg
 )
 
+find_path(qpOASES_INCLUDEDIR
+  NAMES qpOASES.hpp
+  HINTS "${qpOASES_SOURCE_DIR}"
+  ENV qpOASES_SOURCE_DIR
+  PATH_SUFFIXES include)
+find_library(qpOASES_LIB
+  NAMES qpOASES
+  HINTS "${qpOASES_BINARY_DIR}"
+  ENV qpOASES_BINARY_DIR
+  PATH_SUFFIXES lib
+  libs)
+
+set(qpOASES_INCLUDE_DIRS ${qpOASES_INCLUDEDIR})
+set(qpOASES_LIBRARIES ${qpOASES_LIB})
+
 target_link_libraries(franka_example_controllers PUBLIC
   ${Franka_LIBRARIES}
   ${catkin_LIBRARIES}
-
 
   # Link the OSQP shared library
   osqp::osqp
   OsqpEigen::OsqpEigen
   ${qpOASES_LIB}
-  
 )
 
 target_include_directories(franka_example_controllers SYSTEM PUBLIC
