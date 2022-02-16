@@ -10,11 +10,7 @@
 #include <pluginlib/class_list_macros.h>
 #include <ros/ros.h>
 
-// #include <franka_example_controllers/pseudo_inversion.h>
-
-
-// #include "OsqpEigen/OsqpEigen.h"
-// #include <qpOASES.hpp>
+#include <franka_example_controllers/pseudo_inversion.h>
 
 namespace franka_example_controllers {
 
@@ -334,274 +330,27 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   // Allocate variables
   Eigen::VectorXd tau_task(7), tau_nullspace(7), tau_d(7);
   
-  
-// ///////////////////  Paper: Cartesian Impedance Control of Redundant Robots:       /////////////////////////
-// //////////////////          Recent Results with the DLR-Light-Weight-Arms, DLR    /////////////////////////
-  
-// Comment: Works good but cannot find the optimal nullspace joint angles
-  
- 
-//   std::cout <<"External Force:"<<std::endl<< F_ext_filtered <<std::endl;
-  F_ext_filtered.setZero();
-
-  Lambda << (jacobian * mass_inv * jacobian.transpose()).inverse();
-   
-  F_tau = Lambda * ddx - Lambda * M_d.inverse() * (K_d * derror + K_p * error) + (Lambda * M_d.inverse() - I) * F_ext_filtered - Lambda * djacobian * dq;
-   
-  tau_task = jacobian.transpose() * F_tau;
-  
-  // nullspace PD control
- 
-  tau_nullspace << -K_N * (q - q_nullspace) - D_N * dq;
-     
-  N << Eigen::MatrixXd::Identity(7, 7) - jacobian.transpose() * Lambda * jacobian * mass_inv;
-  
-  // Desired torque
-  tau_d << tau_task + coriolis + N * tau_nullspace;
-  
-  q_nullspace << q;
-  
-//  /////////////////////////////////////        Quadratic Programming        ///////////////////////////////// 
-//  //////////////////////////////////// Paper Multi-Priority Cartesian Impedance Control /////////////////////
-  
-// // Comment: Robot is getting instable
-  
-//   Lambda << (jacobian * mass_inv * jacobian.transpose()).inverse();
-//   
-//   J_dash << mass_inv * jacobian.transpose() * Lambda;  
-//   
-//   f << - K_p * error - K_d * derror;
-// // osqp Eigen
-//   
-//     Eigen::Matrix<double, 7, 7> Hessian;
-//     Eigen::Matrix<double, 6, 7> Q;
-//     
-//     Q << jacobian * mass_inv;
-// //     Q << J_dash.transpose();
-// 
-//     Hessian << Q.transpose() * Q;  // this is mass_inv * jacobian.transpose() * jacobian * mass_inv
-//         
-//     Eigen::SparseMatrix<double> H_s(7,7);
-//     
-//     for (int i = 0; i < 7; i++){
-//         for (int j = 0; j < 7; j++){
-//             H_s.insert(i,j) = Hessian(i,j);
-//         }
-//     }
-//     
-//     Eigen::SparseMatrix<double> A_s(7,7);
-//     A_s.setIdentity();
-// 
-//     Eigen::VectorXd gradient(7);
-//     
-// //     gradient << - Q.transpose() * f;
-//      gradient << - Q.transpose() * jacobian * mass_inv * jacobian.transpose() * f;
-// //     gradient << -f.transpose() * J_dash.transpose();
-//     
-//   // TODO check how Nullspace handling in quadratic programming works
-//   
-//     tau_nullspace << -K_N * (q - q_nullspace) - D_N * dq;
-//      
-//     N << Eigen::MatrixXd::Identity(7, 7) - jacobian.transpose() * Lambda * jacobian * mass_inv;
-//     
-//     
-//     Eigen::VectorXd lowerBound(7);
-//     lowerBound << tau_min - coriolis /*- N * tau_nullspace*/;
-// 
-//     Eigen::VectorXd upperBound(7);
-//     upperBound << tau_max - coriolis /*- N * tau_nullspace*/;
-// 
-//     OsqpEigen::Solver solver;
-//     solver.settings()->setVerbosity(true);
-//     solver.settings()->setAlpha(1.0);
-// 
-//     solver.data()->setHessianMatrix(H_s);
-//     solver.data()->setNumberOfVariables(7);
-// 
-//     solver.data()->setNumberOfConstraints(7);
-//     solver.data()->setHessianMatrix(H_s);
-//     solver.data()->setGradient(gradient);
-//     solver.data()->setLinearConstraintsMatrix(A_s);
-//     solver.data()->setLowerBound(lowerBound);
-//     solver.data()->setUpperBound(upperBound);
-//     solver.initSolver();
-// 
-//     solver.solveProblem();
-// 
-//     tau_task = solver.getSolution(); 
-//   
-//   // Desired torque
-//     tau_d << tau_task + coriolis;
-  
-  
-// // qpOASES 
-//   f << - K_p * error - K_d * derror;
-//   
-//   Eigen::Matrix<double, 7, 7> Q1 , Q2;
-//   Eigen::Matrix<double, 6, 7> A2_;
-//   Eigen::VectorXd c1(7), c2(7), b2_(6);
-//   
-//   Q1 << mass_inv * jacobian.transpose() * jacobian * mass_inv;
-//     
-//   c1 << - mass_inv * jacobian.transpose() * jacobian * mass_inv * jacobian.transpose() * f;
-// 
-//   Eigen::VectorXd lowerBound(7);
-//   lowerBound << tau_min - coriolis;
-// 
-//   Eigen::VectorXd upperBound(7);
-//   upperBound << tau_max - coriolis;
-//  
-//   /* Setup data of first QP. */
-// 
-//   qpOASES::real_t H[7*7];
-//   int m = 0;
-//   for (int i = 0; i < 7; i++) {
-//       for (int j = 0; j < 7; j++){
-//             H[m] = Q1(i,j);
-//             m++;
-//         }
-//   }
-//   
-//   qpOASES::real_t g[7];
-//   for (int i = 0; i < 7; i++) {
-//        g[i] = c1(i);
-//   }
-//   
-//   qpOASES::real_t lb[7];
-//   for (int i = 0; i < 7; i++) {
-//        lb[i] = lowerBound(i);
-//   }
-//   
-//   qpOASES::real_t ub[7];
-//   for (int i = 0; i < 7; i++) {
-//        ub[i] = upperBound(i);
-//   }
-// 
-//   /* Setting up QProblem object. */
-// 	qpOASES::QProblemB QP1( 7 ); 
-// 
-// 	qpOASES::Options options;
-// //     options.enableFlippingBounds = qpOASES::BT_FALSE;
-// 	options.initialStatusBounds = qpOASES::ST_INACTIVE;
-// 	options.numRefinementSteps = 1;
-// // 	options.enableCholeskyRefactorisation = 1;
-// 	QP1.setOptions( options );
-// 
-// 	/* Solve first QP. */
-// 	qpOASES::int_t nWSR = 20;
-// 	QP1.init( H, g, lb, ub, nWSR, 0 );
-// 
-// 	/* Get and solution of first QP. */
-// 	qpOASES::real_t xOpt1[7];
-//     
-// 	QP1.getPrimalSolution( xOpt1 );
-//     
-//   for (int i = 0; i < 7; i++) {
-//        tau_0(i) = xOpt1[i];
-//   }
-//   
-// 
-//   /* Setup data of second QP for Nullspace handling. */
-//   tau_nullspace << -K_N * (q - q_nullspace) - D_N * dq;
-//   
-//   Q2 << Q1;
-//   
-//   qpOASES::real_t H2[7*7];
-//   m = 0;
-//   for (int i = 0; i < 7; i++) {
-//       for (int j = 0; j < 7; j++){
-//             H2[m] = Q2(i,j);
-//             m++;
-//         }
-//   }
-//   
-//   c2 << - mass_inv * jacobian.transpose() * jacobian * mass_inv * tau_nullspace;
-//   
-//   A2_ << jacobian * mass_inv;
-//   b2_ << jacobian * mass_inv * tau_0;
-//   
-//   qpOASES::real_t g2[7];
-//   for (int i = 0; i < 7; i++) {
-//        g2[i] = c2(i);
-//   }
-//   
-//   qpOASES::real_t A2[6*7];
-//   m = 0;
-//   for (int i = 0; i < 6; i++) {
-//       for (int j = 0; j < 7; j++){
-//             A2[m] = A2_(i,j);
-//             m++;
-//         }
-//   }
-//   qpOASES::real_t b2[7];
-//   for (int i = 0; i < 6; i++) {
-//        g[i] = b2_(i);
-//   }
-//   
-// /* Setting up QProblem object. */
-// 	qpOASES::QProblem QP2( 7,1 );
-// 
-// 	QP2.setOptions( options );
-// 
-// 	/* Solve first QP. */
-// 	QP2.init( H2,g2,A2,lb,ub,b2,b2, nWSR, 0 );
-// 
-// 	/* Get and solution of first QP. */
-// 	qpOASES::real_t xOpt2[7];
-// 	QP2.getPrimalSolution( xOpt2 );
-//     
-//       for (int i = 0; i < 7; i++) {
-//        tau_task(i) = xOpt2[i];
-//   }
-//   
-//     tau_d << tau_task /*+ coriolis*/;
-    
-    
-// ///////////////////  Paper: Multiple priority impedance control       /////////////////////////
-// ///////////////////                  Robert Platt Jr                  //////////////////////// 
-  
-// // Comment:
-  
-//   F_ext_filtered.setZero();
-//   
-//   Eigen::MatrixXd J_W(7,6) , W(7,7), N_W(7,7);
-//   
-//   W.setIdentity();
-//   
-//   J_W << W.inverse() * jacobian.transpose() * (jacobian * W.inverse() * jacobian.transpose()).inverse();
-//   
-//   N_W << Eigen::MatrixXd::Identity(7, 7) - J_W * jacobian;
-//   
-//   tau_nullspace << K_N * (q - q_nullspace) + D_N * dq;
-//   
-//   tau_task = mass * J_W *(ddx + M_d.inverse() * (F_ext_filtered - K_d * derror - K_p * error) - djacobian * dq) + mass * N_W * M_d.inverse() * (-tau_nullspace);
-//   
-//   // Desired torque
-//   tau_d << tau_task + coriolis;
-//   
-//   q_nullspace << q;
-  
 //  ////////////////////////////////////      PID controller     /////////////////////////////////////////
   
-//   // pseudoinverse for nullspace handling
-//   Eigen::MatrixXd jacobian_transpose_pinv;
-//   pseudoInverse(jacobian.transpose(), jacobian_transpose_pinv);
+  // pseudoinverse for nullspace handling
+  Eigen::MatrixXd jacobian_transpose_pinv;
+  pseudoInverse(jacobian.transpose(), jacobian_transpose_pinv);
   
-//   eint << eint + error * period.toSec();
-//   
-//   
-//   // Cartesian PID control
-//   tau_task << jacobian.transpose() * (-K_P * error -K_D * derror -K_I * eint);
+  eint << eint + error * period.toSec();
   
-//  // nullspace PD control with damping ratio = 1
   
-//   tau_nullspace << (Eigen::MatrixXd::Identity(7, 7) -
-//                     jacobian.transpose() * jacobian_transpose_pinv) *
-//                        (nullspace_stiffness_ * (q_d_nullspace_ - q) -
-//                         (2.0 * sqrt(nullspace_stiffness_)) * dq);
-//   
-//   // Desired torque
-//   tau_d << tau_task + coriolis + tau_nullspace;     
+  // Cartesian PID control
+  tau_task << jacobian.transpose() * (-K_P * error -K_D * derror -K_I * eint);
+  
+ // nullspace PD control with damping ratio = 1
+  
+  tau_nullspace << (Eigen::MatrixXd::Identity(7, 7) -
+                    jacobian.transpose() * jacobian_transpose_pinv) *
+                       (nullspace_stiffness_ * (q_d_nullspace_ - q) -
+                        (2.0 * sqrt(nullspace_stiffness_)) * dq);
+  
+  // Desired torque
+  tau_d << tau_task + coriolis + tau_nullspace;     
   
 // ////////////////////////////////////////////////////////////////////////////////////////////////////////
   
