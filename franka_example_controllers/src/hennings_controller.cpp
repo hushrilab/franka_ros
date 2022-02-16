@@ -12,7 +12,6 @@
 
 // #include <franka_example_controllers/pseudo_inversion.h>
 
-
 // #include "OsqpEigen/OsqpEigen.h"
 // #include <qpOASES.hpp>
 
