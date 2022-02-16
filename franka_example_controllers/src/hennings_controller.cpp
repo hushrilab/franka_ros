@@ -331,29 +331,32 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   Eigen::VectorXd tau_task(7), tau_nullspace(7), tau_d(7);
   
    
-// // ///////////////////  Paper: Multiple priority impedance control       /////////////////////////
-// // ///////////////////                  Robert Platt Jr                  //////////////////////// 
+///////////////////  Paper: Cartesian Impedance Control of Redundant Robots:       /////////////////////////
+//////////////////          Recent Results with the DLR-Light-Weight-Arms, DLR    /////////////////////////
   
-// Comment:
+// Comment: Works good but cannot find the optimal nullspace joint angles
   
+ 
+//   std::cout <<"External Force:"<<std::endl<< F_ext_filtered <<std::endl;
   F_ext_filtered.setZero();
+
+  Lambda << (jacobian * mass_inv * jacobian.transpose()).inverse();
+   
+  F_tau = Lambda * ddx - Lambda * M_d.inverse() * (K_d * derror + K_p * error) + (Lambda * M_d.inverse() - I) * F_ext_filtered - Lambda * djacobian * dq;
+   
+  tau_task = jacobian.transpose() * F_tau;
   
-  Eigen::MatrixXd J_W(7,6) , W(7,7), N_W(7,7);
-  
-  W.setIdentity();
-  
-  J_W << W.inverse() * jacobian.transpose() * (jacobian * W.inverse() * jacobian.transpose()).inverse();
-  
-  N_W << Eigen::MatrixXd::Identity(7, 7) - J_W * jacobian;
-  
-  tau_nullspace << K_N * (q - q_nullspace) + D_N * dq;
-  
-  tau_task = mass * J_W *(ddx + M_d.inverse() * (F_ext_filtered - K_d * derror - K_p * error) - djacobian * dq) + mass * N_W * M_d.inverse() * (-tau_nullspace);
+  // nullspace PD control
+ 
+  tau_nullspace << -K_N * (q - q_nullspace) - D_N * dq;
+     
+  N << Eigen::MatrixXd::Identity(7, 7) - jacobian.transpose() * Lambda * jacobian * mass_inv;
   
   // Desired torque
-  tau_d << tau_task + coriolis;
+  tau_d << tau_task + coriolis + N * tau_nullspace;
   
   q_nullspace << q;
+ 
   
   
   // Saturate torque rate to avoid discontinuities
