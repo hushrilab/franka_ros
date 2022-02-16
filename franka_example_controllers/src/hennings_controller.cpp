@@ -10,7 +10,7 @@
 #include <pluginlib/class_list_macros.h>
 #include <ros/ros.h>
 
-#include <franka_example_controllers/pseudo_inversion.h>
+// #include <franka_example_controllers/pseudo_inversion.h>
 
 namespace franka_example_controllers {
 
@@ -330,29 +330,31 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   // Allocate variables
   Eigen::VectorXd tau_task(7), tau_nullspace(7), tau_d(7);
   
-//  ////////////////////////////////////      PID controller     /////////////////////////////////////////
+   
+// // ///////////////////  Paper: Multiple priority impedance control       /////////////////////////
+// // ///////////////////                  Robert Platt Jr                  //////////////////////// 
   
-  // pseudoinverse for nullspace handling
-  Eigen::MatrixXd jacobian_transpose_pinv;
-  pseudoInverse(jacobian.transpose(), jacobian_transpose_pinv);
+// Comment:
   
-  eint << eint + error * period.toSec();
+  F_ext_filtered.setZero();
   
+  Eigen::MatrixXd J_W(7,6) , W(7,7), N_W(7,7);
   
-  // Cartesian PID control
-  tau_task << jacobian.transpose() * (-K_P * error -K_D * derror -K_I * eint);
+  W.setIdentity();
   
- // nullspace PD control with damping ratio = 1
+  J_W << W.inverse() * jacobian.transpose() * (jacobian * W.inverse() * jacobian.transpose()).inverse();
   
-  tau_nullspace << (Eigen::MatrixXd::Identity(7, 7) -
-                    jacobian.transpose() * jacobian_transpose_pinv) *
-                       (nullspace_stiffness_ * (q_d_nullspace_ - q) -
-                        (2.0 * sqrt(nullspace_stiffness_)) * dq);
+  N_W << Eigen::MatrixXd::Identity(7, 7) - J_W * jacobian;
+  
+  tau_nullspace << K_N * (q - q_nullspace) + D_N * dq;
+  
+  tau_task = mass * J_W *(ddx + M_d.inverse() * (F_ext_filtered - K_d * derror - K_p * error) - djacobian * dq) + mass * N_W * M_d.inverse() * (-tau_nullspace);
   
   // Desired torque
-  tau_d << tau_task + coriolis + tau_nullspace;     
+  tau_d << tau_task + coriolis;
   
-// ////////////////////////////////////////////////////////////////////////////////////////////////////////
+  q_nullspace << q;
+  
   
   // Saturate torque rate to avoid discontinuities
   tau_d << saturateTorqueRate(tau_d, tau_J_d);
