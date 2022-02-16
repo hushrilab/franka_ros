@@ -12,8 +12,8 @@
 
 // #include <franka_example_controllers/pseudo_inversion.h>
 
-#include "OsqpEigen/OsqpEigen.h"
-#include <qpOASES.hpp>
+// #include "OsqpEigen/OsqpEigen.h"
+// #include <qpOASES.hpp>
 
 namespace franka_example_controllers {
 
@@ -232,10 +232,10 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 
 //  // Point to Point movements
 
-//   position_d_target << 0.3,
-//                        0,
-//                        0.6;
-  position_d_target << position_init;
+  position_d_target << 0.3,
+                       0,
+                       0.6;
+//   position_d_target << position_init;
   
   angles_d <<  0  * M_PI/180 + M_PI,  // x-axis (roll)
                0  * M_PI/180,         // y-axis (pitch)
