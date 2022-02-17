@@ -66,7 +66,7 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   Eigen::Matrix<double, 6, 1> eint;
   
   
-  
+  bool flag;
   Eigen::Matrix<double, 6, 6> Lambda;
   Eigen::Matrix<double, 7, 6> J_plus;
   Eigen::Matrix<double, 6, 7> J_T_plus;

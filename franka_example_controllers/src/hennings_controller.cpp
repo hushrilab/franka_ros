@@ -121,6 +121,8 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
   tau_max << 87, 87, 87, 87, 12, 12, 12;
   tau_min << -tau_max;
   
+  flag = true;
+  
   return true;
 }
 
@@ -182,9 +184,14 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   Eigen::Matrix<double, 7, 7> mass_inv;
   mass_inv << mass.inverse();
   
+  if (flag){
+      djacobian << (jacobian - jacobian_prev) / 0.001;
+  ddq << (dq - dq_prev) / 0.001;  
+  }
+  else{
   djacobian << (jacobian - jacobian_prev) / period.toSec();
   ddq << (dq - dq_prev) / period.toSec();
-  
+  }
   // Filter signals
   
   Eigen::MatrixXd y(7,7);
@@ -375,6 +382,7 @@ for (size_t i = 0; i < 7; ++i) {
   F_ext_prev << F_ext;
   ddq_prev << ddq;
   dq_prev << dq;
+  flag = false;
 }
 
 Eigen::Matrix<double, 7, 1> HenningImpedanceController::saturateTorqueRate(
