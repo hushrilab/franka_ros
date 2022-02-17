@@ -5,8 +5,6 @@ set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# To add Henning modifications
-
 find_package(catkin REQUIRED COMPONENTS
   controller_interface
   dynamic_reconfigure
@@ -73,6 +71,7 @@ add_library(franka_example_controllers
   src/force_example_controller.cpp
   src/dual_arm_cartesian_impedance_example_controller.cpp
   src/teleop_joint_pd_example_controller.cpp
+  src/hennings_controller.cpp
 )
 
 add_dependencies(franka_example_controllers

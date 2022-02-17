@@ -12,9 +12,6 @@
 
 // #include <franka_example_controllers/pseudo_inversion.h>
 
-#include "OsqpEigen/OsqpEigen.h"
-#include <qpOASES.hpp>
-
 namespace franka_example_controllers {
 
 bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
@@ -22,9 +19,9 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
   std::vector<double> cartesian_stiffness_vector;
   std::vector<double> cartesian_damping_vector;
 
-//   sub_equilibrium_pose_ = node_handle.subscribe(
-//       "equilibrium_pose", 20, &HenningImpedanceController::equilibriumPoseCallback, this,
-//       ros::TransportHints().reliable().tcpNoDelay());
+  sub_equilibrium_pose_ = node_handle.subscribe(
+      "equilibrium_pose", 20, &HenningImpedanceController::equilibriumPoseCallback, this,
+      ros::TransportHints().reliable().tcpNoDelay());
 
   std::string arm_id;
   if (!node_handle.getParam("arm_id", arm_id)) {
@@ -93,26 +90,14 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
   dynamic_server_compliance_param_ = std::make_unique<
       dynamic_reconfigure::Server<franka_example_controllers::compliance_paramConfig>>(
       dynamic_reconfigure_compliance_param_node_);
-//   dynamic_server_compliance_param_->setCallback(
-//       boost::bind(&HenningImpedanceController::complianceParamCallback, this, _1, _2));
+  dynamic_server_compliance_param_->setCallback(
+      boost::bind(&HenningImpedanceController::complianceParamCallback, this, _1, _2));
 
   // Variable Initialization
   position_d.setZero();
   orientation_d.coeffs() << 0.0, 0.0, 0.0, 1.0;
   position_d_target.setZero();
-  orientation_d_target.coeffs() << 0.0, 0.0, 0.0, 1.0;
-
-  
-  // For PID Controller
-  eint.setZero();
-  
-  K_P.setIdentity();
-  K_I.setIdentity();
-  K_D.setIdentity();
-  
-  K_P.diagonal() << 300, 300, 300, 60, 60, 60;
-  K_D.diagonal() << 10, 10, 10, 5, 5, 5;
-  K_I.diagonal() << 0.2, 0.2, 0.2, 0.2, 0.2, 0.2;
+  orientation_d_target.coeffs() << 0.0, 0.0, 0.0, 1.0;  
   
 //   For Impedance Controller
   
@@ -120,17 +105,14 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
   K_d.setIdentity(); 
   M_d.setIdentity(); 
   
-  S_P.setIdentity();
-  
   M_d.diagonal() << 0.5, 0.5, 0.5, 0.5, 0.5, 0.5;
   K_p.diagonal() << 350, 350, 350, 200, 200, 200;
-//     K_p.diagonal() << 35, 35, 35, 20, 20, 20;  // works better for osqp eigen
   K_d.diagonal() << 20, 20, 20, 30, 30, 30;
   
   // Nullspace stiffness and damping
   K_N.setIdentity();
   D_N.setIdentity();
-  K_N << K_N * 30;
+  K_N << K_N * 15;
   D_N << D_N * 0.5 * sqrt(K_N(0,0));  
   
   // To check max values
@@ -333,9 +315,9 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   // Allocate variables
   Eigen::VectorXd tau_task(7), tau_nullspace(7), tau_d(7);
   
-  
-// ///////////////////  Paper: Cartesian Impedance Control of Redundant Robots:       /////////////////////////
-// //////////////////          Recent Results with the DLR-Light-Weight-Arms, DLR    /////////////////////////
+   
+///////////////////  Paper: Cartesian Impedance Control of Redundant Robots:       /////////////////////////
+//////////////////          Recent Results with the DLR-Light-Weight-Arms, DLR    /////////////////////////
   
 // Comment: Works good but cannot find the optimal nullspace joint angles
   
@@ -359,256 +341,17 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   tau_d << tau_task + coriolis + N * tau_nullspace;
   
   q_nullspace << q;
+ 
   
-//  /////////////////////////////////////        Quadratic Programming        ///////////////////////////////// 
-//  //////////////////////////////////// Paper Multi-Priority Cartesian Impedance Control /////////////////////
-  
-// // Comment: Robot is getting instable
-  
-//   Lambda << (jacobian * mass_inv * jacobian.transpose()).inverse();
-//   
-//   J_dash << mass_inv * jacobian.transpose() * Lambda;  
-//   
-//   f << - K_p * error - K_d * derror;
-// // osqp Eigen
-//   
-//     Eigen::Matrix<double, 7, 7> Hessian;
-//     Eigen::Matrix<double, 6, 7> Q;
-//     
-//     Q << jacobian * mass_inv;
-// //     Q << J_dash.transpose();
-// 
-//     Hessian << Q.transpose() * Q;  // this is mass_inv * jacobian.transpose() * jacobian * mass_inv
-//         
-//     Eigen::SparseMatrix<double> H_s(7,7);
-//     
-//     for (int i = 0; i < 7; i++){
-//         for (int j = 0; j < 7; j++){
-//             H_s.insert(i,j) = Hessian(i,j);
-//         }
-//     }
-//     
-//     Eigen::SparseMatrix<double> A_s(7,7);
-//     A_s.setIdentity();
-// 
-//     Eigen::VectorXd gradient(7);
-//     
-// //     gradient << - Q.transpose() * f;
-//      gradient << - Q.transpose() * jacobian * mass_inv * jacobian.transpose() * f;
-// //     gradient << -f.transpose() * J_dash.transpose();
-//     
-//   // TODO check how Nullspace handling in quadratic programming works
-//   
-//     tau_nullspace << -K_N * (q - q_nullspace) - D_N * dq;
-//      
-//     N << Eigen::MatrixXd::Identity(7, 7) - jacobian.transpose() * Lambda * jacobian * mass_inv;
-//     
-//     
-//     Eigen::VectorXd lowerBound(7);
-//     lowerBound << tau_min - coriolis /*- N * tau_nullspace*/;
-// 
-//     Eigen::VectorXd upperBound(7);
-//     upperBound << tau_max - coriolis /*- N * tau_nullspace*/;
-// 
-//     OsqpEigen::Solver solver;
-//     solver.settings()->setVerbosity(true);
-//     solver.settings()->setAlpha(1.0);
-// 
-//     solver.data()->setHessianMatrix(H_s);
-//     solver.data()->setNumberOfVariables(7);
-// 
-//     solver.data()->setNumberOfConstraints(7);
-//     solver.data()->setHessianMatrix(H_s);
-//     solver.data()->setGradient(gradient);
-//     solver.data()->setLinearConstraintsMatrix(A_s);
-//     solver.data()->setLowerBound(lowerBound);
-//     solver.data()->setUpperBound(upperBound);
-//     solver.initSolver();
-// 
-//     solver.solveProblem();
-// 
-//     tau_task = solver.getSolution(); 
-//   
-//   // Desired torque
-//     tau_d << tau_task + coriolis;
-  
-  
-// // qpOASES 
-//   f << - K_p * error - K_d * derror;
-//   
-//   Eigen::Matrix<double, 7, 7> Q1 , Q2;
-//   Eigen::Matrix<double, 6, 7> A2_;
-//   Eigen::VectorXd c1(7), c2(7), b2_(6);
-//   
-//   Q1 << mass_inv * jacobian.transpose() * jacobian * mass_inv;
-//     
-//   c1 << - mass_inv * jacobian.transpose() * jacobian * mass_inv * jacobian.transpose() * f;
-// 
-//   Eigen::VectorXd lowerBound(7);
-//   lowerBound << tau_min - coriolis;
-// 
-//   Eigen::VectorXd upperBound(7);
-//   upperBound << tau_max - coriolis;
-//  
-//   /* Setup data of first QP. */
-// 
-//   qpOASES::real_t H[7*7];
-//   int m = 0;
-//   for (int i = 0; i < 7; i++) {
-//       for (int j = 0; j < 7; j++){
-//             H[m] = Q1(i,j);
-//             m++;
-//         }
-//   }
-//   
-//   qpOASES::real_t g[7];
-//   for (int i = 0; i < 7; i++) {
-//        g[i] = c1(i);
-//   }
-//   
-//   qpOASES::real_t lb[7];
-//   for (int i = 0; i < 7; i++) {
-//        lb[i] = lowerBound(i);
-//   }
-//   
-//   qpOASES::real_t ub[7];
-//   for (int i = 0; i < 7; i++) {
-//        ub[i] = upperBound(i);
-//   }
-// 
-//   /* Setting up QProblem object. */
-// 	qpOASES::QProblemB QP1( 7 ); 
-// 
-// 	qpOASES::Options options;
-// //     options.enableFlippingBounds = qpOASES::BT_FALSE;
-// 	options.initialStatusBounds = qpOASES::ST_INACTIVE;
-// 	options.numRefinementSteps = 1;
-// // 	options.enableCholeskyRefactorisation = 1;
-// 	QP1.setOptions( options );
-// 
-// 	/* Solve first QP. */
-// 	qpOASES::int_t nWSR = 20;
-// 	QP1.init( H, g, lb, ub, nWSR, 0 );
-// 
-// 	/* Get and solution of first QP. */
-// 	qpOASES::real_t xOpt1[7];
-//     
-// 	QP1.getPrimalSolution( xOpt1 );
-//     
-//   for (int i = 0; i < 7; i++) {
-//        tau_0(i) = xOpt1[i];
-//   }
-//   
-// 
-//   /* Setup data of second QP for Nullspace handling. */
-//   tau_nullspace << -K_N * (q - q_nullspace) - D_N * dq;
-//   
-//   Q2 << Q1;
-//   
-//   qpOASES::real_t H2[7*7];
-//   m = 0;
-//   for (int i = 0; i < 7; i++) {
-//       for (int j = 0; j < 7; j++){
-//             H2[m] = Q2(i,j);
-//             m++;
-//         }
-//   }
-//   
-//   c2 << - mass_inv * jacobian.transpose() * jacobian * mass_inv * tau_nullspace;
-//   
-//   A2_ << jacobian * mass_inv;
-//   b2_ << jacobian * mass_inv * tau_0;
-//   
-//   qpOASES::real_t g2[7];
-//   for (int i = 0; i < 7; i++) {
-//        g2[i] = c2(i);
-//   }
-//   
-//   qpOASES::real_t A2[6*7];
-//   m = 0;
-//   for (int i = 0; i < 6; i++) {
-//       for (int j = 0; j < 7; j++){
-//             A2[m] = A2_(i,j);
-//             m++;
-//         }
-//   }
-//   qpOASES::real_t b2[7];
-//   for (int i = 0; i < 6; i++) {
-//        g[i] = b2_(i);
-//   }
-//   
-// /* Setting up QProblem object. */
-// 	qpOASES::QProblem QP2( 7,1 );
-// 
-// 	QP2.setOptions( options );
-// 
-// 	/* Solve first QP. */
-// 	QP2.init( H2,g2,A2,lb,ub,b2,b2, nWSR, 0 );
-// 
-// 	/* Get and solution of first QP. */
-// 	qpOASES::real_t xOpt2[7];
-// 	QP2.getPrimalSolution( xOpt2 );
-//     
-//       for (int i = 0; i < 7; i++) {
-//        tau_task(i) = xOpt2[i];
-//   }
-//   
-//     tau_d << tau_task /*+ coriolis*/;
-    
-    
-// ///////////////////  Paper: Multiple priority impedance control       /////////////////////////
-// ///////////////////                  Robert Platt Jr                  //////////////////////// 
-  
-// // Comment:
-  
-//   F_ext_filtered.setZero();
-//   
-//   Eigen::MatrixXd J_W(7,6) , W(7,7), N_W(7,7);
-//   
-//   W.setIdentity();
-//   
-//   J_W << W.inverse() * jacobian.transpose() * (jacobian * W.inverse() * jacobian.transpose()).inverse();
-//   
-//   N_W << Eigen::MatrixXd::Identity(7, 7) - J_W * jacobian;
-//   
-//   tau_nullspace << K_N * (q - q_nullspace) + D_N * dq;
-//   
-//   tau_task = mass * J_W *(ddx + M_d.inverse() * (F_ext_filtered - K_d * derror - K_p * error) - djacobian * dq) + mass * N_W * M_d.inverse() * (-tau_nullspace);
-//   
-//   // Desired torque
-//   tau_d << tau_task + coriolis;
-//   
-//   q_nullspace << q;
-  
-//  ////////////////////////////////////      PID controller     /////////////////////////////////////////
-  
-//   // pseudoinverse for nullspace handling
-//   Eigen::MatrixXd jacobian_transpose_pinv;
-//   pseudoInverse(jacobian.transpose(), jacobian_transpose_pinv);
-  
-//   eint << eint + error * period.toSec();
-//   
-//   
-//   // Cartesian PID control
-//   tau_task << jacobian.transpose() * (-K_P * error -K_D * derror -K_I * eint);
-  
-//  // nullspace PD control with damping ratio = 1
-  
-//   tau_nullspace << (Eigen::MatrixXd::Identity(7, 7) -
-//                     jacobian.transpose() * jacobian_transpose_pinv) *
-//                        (nullspace_stiffness_ * (q_d_nullspace_ - q) -
-//                         (2.0 * sqrt(nullspace_stiffness_)) * dq);
-//   
-//   // Desired torque
-//   tau_d << tau_task + coriolis + tau_nullspace;     
-  
-// ////////////////////////////////////////////////////////////////////////////////////////////////////////
   
   // Saturate torque rate to avoid discontinuities
   tau_d << saturateTorqueRate(tau_d, tau_J_d);
   for (size_t i = 0; i < 7; ++i) {
     joint_handles_[i].setCommand(tau_d(i));
   }
+  
+  std::lock_guard<std::mutex> position_d_target_mutex_lock(
+      position_and_orientation_d_target_mutex);
   
 //    std::cout << "Error" <<std::endl<< error <<std::endl; 
 
@@ -632,8 +375,6 @@ for (size_t i = 0; i < 7; ++i) {
   F_ext_prev << F_ext;
   ddq_prev << ddq;
   dq_prev << dq;
-
-
 }
 
 Eigen::Matrix<double, 7, 1> HenningImpedanceController::saturateTorqueRate(
@@ -653,6 +394,25 @@ Eigen::Matrix<double, 7, 1> HenningImpedanceController::saturateTorqueRate(
         
   y.resize(rows,cols);
   y << (1 - filter_param) * y_prev + filter_param * (input + input_prev) / 2;
+}
+
+void HenningImpedanceController::complianceParamCallback(
+    franka_example_controllers::compliance_paramConfig& config,
+    uint32_t /*level*/) {
+}
+
+void HenningImpedanceController::equilibriumPoseCallback(
+    const geometry_msgs::PoseStampedConstPtr& msg) {
+  std::lock_guard<std::mutex> position_d_target_mutex_lock(
+      position_and_orientation_d_target_mutex);
+  position_d_target << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
+  Eigen::Quaterniond last_orientation_d_target(orientation_d_target);
+  orientation_d_target.coeffs() << msg->pose.orientation.x, msg->pose.orientation.y,
+      msg->pose.orientation.z, msg->pose.orientation.w;
+  if (last_orientation_d_target.coeffs().dot(orientation_d_target.coeffs()) < 0.0) {
+    orientation_d_target.coeffs() << -orientation_d_target.coeffs();
+  }
+  std::cout << "equilibriumPoseCallback function used" << std::endl;
 }
 
 }  // namespace franka_example_controllers
