@@ -160,7 +160,7 @@ void HenningImpedanceController::starting(const ros::Time& /*time*/) {
   F_ext_filtered << F_ext;
   
   // set nullspace equilibrium configuration to initial q
-  q_d_nullspace_ = q_initial;
+  q_nullspace = q_initial;
 }
 
 void HenningImpedanceController::update(const ros::Time& time, const ros::Duration& period) {
