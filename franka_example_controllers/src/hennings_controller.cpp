@@ -123,6 +123,15 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
   
   flag = true;
   
+  const std::array<double, 7> lower_torque_thresholds {-60, -60, -60, -60, -12, -12, -12};
+  const std::array<double, 7> upper_torque_thresholds {60, 60, 60, 60, 12, 12, 12};
+  const std::array<double, 6> lower_force_thresholds {-50, -50, -50, -50, -50, -50};
+  const std::array<double, 6> upper_force_thresholds {50, 50, 50, 50, 50, 50};
+
+  std::string franka_addr ("franka1");
+  franka::Robot robot(franka_addr);
+  robot.setCollisionBehavior(lower_torque_thresholds, upper_torque_thresholds, lower_force_thresholds, upper_force_thresholds);
+  
   return true;
 }
 
