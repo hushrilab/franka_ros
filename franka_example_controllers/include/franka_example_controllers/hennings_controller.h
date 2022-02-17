@@ -20,6 +20,9 @@
 #include <franka_hw/franka_model_interface.h>
 #include <franka_hw/franka_state_interface.h>
 
+// #include <franka_example_controllers/pseudo_inversion.h>
+#include <franka/robot.h>
+
 namespace franka_example_controllers {
 
 class HenningImpedanceController : public controller_interface::MultiInterfaceController<
@@ -44,6 +47,7 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   std::unique_ptr<franka_hw::FrankaStateHandle> state_handle_;
   std::unique_ptr<franka_hw::FrankaModelHandle> model_handle_;
   std::vector<hardware_interface::JointHandle> joint_handles_;
+
   
   // for trajectory
   double r {0.1};
