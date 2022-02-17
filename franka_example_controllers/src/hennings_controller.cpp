@@ -106,8 +106,8 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
   M_d.setIdentity(); 
   
   M_d.diagonal() << 0.5, 0.5, 0.5, 0.5, 0.5, 0.5;
-  K_p.diagonal() << 350, 350, 350, 200, 200, 200;
-  K_d.diagonal() << 20, 20, 20, 30, 30, 30;
+  K_p.diagonal() << 100, 100, 100, 500, 300, 300;
+  K_d.diagonal() << 20, 20, 20, 10, 10, 10;
   
   // Nullspace stiffness and damping
   K_N.setIdentity();
@@ -122,15 +122,6 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
   tau_min << -tau_max;
   
   flag = true;
-  
-  const std::array<double, 7> lower_torque_thresholds {-60, -60, -60, -60, -12, -12, -12};
-  const std::array<double, 7> upper_torque_thresholds {60, 60, 60, 60, 12, 12, 12};
-  const std::array<double, 6> lower_force_thresholds {-50, -50, -50, -50, -50, -50};
-  const std::array<double, 6> upper_force_thresholds {50, 50, 50, 50, 50, 50};
-
-  std::string franka_addr ("franka1");
-  franka::Robot robot(franka_addr);
-  robot.setCollisionBehavior(lower_torque_thresholds, upper_torque_thresholds, lower_force_thresholds, upper_force_thresholds);
   
   return true;
 }
@@ -161,9 +152,10 @@ void HenningImpedanceController::starting(const ros::Time& /*time*/) {
   orientation_d = orientation_init;
   
   angles_init << orientation_init.toRotationMatrix().eulerAngles(0, 1, 2);
-//   std::cout<<std::endl<< "Angles" << std::endl << curr_angles << std::endl;
-//   std::cout<<"Initial Orient" << std::endl<<orientation_d.coeffs()<<std::endl;
-  
+   std::cout<<std::endl<< "Angles" << std::endl << angles_init << std::endl;
+   std::cout<<"Initial Orient" << std::endl<<orientation_d.coeffs()<<std::endl;
+   std::cout<<"Initial Pos" << std::endl<<position_init<<std::endl;
+
   Eigen::Map<Eigen::Matrix<double, 6, 1>> F_ext(initial_state.O_F_ext_hat_K.data());
   F_ext_prev << F_ext;
   F_ext_filtered << F_ext;
@@ -230,12 +222,12 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 
 //  // Point to Point movements
 
-//   position_d_target << 0.3,
-//                        0,
-//                        0.6;
-  position_d_target << position_init;
+   position_d_target << 0.3,
+                        0,
+                        0.5;
+//  position_d_target << position_init;
   
-  angles_d <<  0  * M_PI/180 + M_PI,  // x-axis (roll)
+  angles_d <<  20  * M_PI/180 + M_PI,  // x-axis (roll)
                0  * M_PI/180,         // y-axis (pitch)
                0  * M_PI/180;         // z-axis (yaw) compared to base frame in intial position
 
@@ -429,7 +421,7 @@ void HenningImpedanceController::equilibriumPoseCallback(
   if (last_orientation_d_target.coeffs().dot(orientation_d_target.coeffs()) < 0.0) {
     orientation_d_target.coeffs() << -orientation_d_target.coeffs();
   }
-  std::cout << "equilibriumPoseCallback function used" << std::endl;
+ // std::cout << "equilibriumPoseCallback function used" << std::endl;
 }
 
 }  // namespace franka_example_controllers
