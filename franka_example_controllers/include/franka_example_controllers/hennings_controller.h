@@ -122,7 +122,7 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   Eigen::Vector3d omega_d_global;
   Eigen::Vector3d domega_d_local;
   Eigen::Vector3d domega_d_global;
-//   std::mutex position_and_orientation_d_target_mutex_;
+  std::mutex position_and_orientation_d_target_mutex;
 //   Eigen::Vector3d position_d_target_;
 //   Eigen::Quaterniond orientation_d_target_;
 

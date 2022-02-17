@@ -19,9 +19,9 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
   std::vector<double> cartesian_stiffness_vector;
   std::vector<double> cartesian_damping_vector;
 
-//   sub_equilibrium_pose_ = node_handle.subscribe(
-//       "equilibrium_pose", 20, &HenningImpedanceController::equilibriumPoseCallback, this,
-//       ros::TransportHints().reliable().tcpNoDelay());
+  sub_equilibrium_pose_ = node_handle.subscribe(
+      "equilibrium_pose", 20, &HenningImpedanceController::equilibriumPoseCallback, this,
+      ros::TransportHints().reliable().tcpNoDelay());
 
   std::string arm_id;
   if (!node_handle.getParam("arm_id", arm_id)) {
@@ -90,26 +90,14 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
   dynamic_server_compliance_param_ = std::make_unique<
       dynamic_reconfigure::Server<franka_example_controllers::compliance_paramConfig>>(
       dynamic_reconfigure_compliance_param_node_);
-//   dynamic_server_compliance_param_->setCallback(
-//       boost::bind(&HenningImpedanceController::complianceParamCallback, this, _1, _2));
+  dynamic_server_compliance_param_->setCallback(
+      boost::bind(&HenningImpedanceController::complianceParamCallback, this, _1, _2));
 
   // Variable Initialization
   position_d.setZero();
   orientation_d.coeffs() << 0.0, 0.0, 0.0, 1.0;
   position_d_target.setZero();
-  orientation_d_target.coeffs() << 0.0, 0.0, 0.0, 1.0;
-
-  
-  // For PID Controller
-  eint.setZero();
-  
-  K_P.setIdentity();
-  K_I.setIdentity();
-  K_D.setIdentity();
-  
-  K_P.diagonal() << 300, 300, 300, 60, 60, 60;
-  K_D.diagonal() << 10, 10, 10, 5, 5, 5;
-  K_I.diagonal() << 0.2, 0.2, 0.2, 0.2, 0.2, 0.2;
+  orientation_d_target.coeffs() << 0.0, 0.0, 0.0, 1.0;  
   
 //   For Impedance Controller
   
@@ -117,17 +105,14 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
   K_d.setIdentity(); 
   M_d.setIdentity(); 
   
-  S_P.setIdentity();
-  
   M_d.diagonal() << 0.5, 0.5, 0.5, 0.5, 0.5, 0.5;
   K_p.diagonal() << 350, 350, 350, 200, 200, 200;
-//     K_p.diagonal() << 35, 35, 35, 20, 20, 20;  // works better for osqp eigen
   K_d.diagonal() << 20, 20, 20, 30, 30, 30;
   
   // Nullspace stiffness and damping
   K_N.setIdentity();
   D_N.setIdentity();
-  K_N << K_N * 30;
+  K_N << K_N * 15;
   D_N << D_N * 0.5 * sqrt(K_N(0,0));  
   
   // To check max values
@@ -229,10 +214,10 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 
 //  // Point to Point movements
 
-  position_d_target << 0.3,
-                       0,
-                       0.6;
-//   position_d_target << position_init;
+//   position_d_target << 0.3,
+//                        0,
+//                        0.6;
+  position_d_target << position_init;
   
   angles_d <<  0  * M_PI/180 + M_PI,  // x-axis (roll)
                0  * M_PI/180,         // y-axis (pitch)
@@ -365,6 +350,9 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
     joint_handles_[i].setCommand(tau_d(i));
   }
   
+  std::lock_guard<std::mutex> position_d_target_mutex_lock(
+      position_and_orientation_d_target_mutex);
+  
 //    std::cout << "Error" <<std::endl<< error <<std::endl; 
 
 // Compare all values
@@ -387,8 +375,6 @@ for (size_t i = 0; i < 7; ++i) {
   F_ext_prev << F_ext;
   ddq_prev << ddq;
   dq_prev << dq;
-
-
 }
 
 Eigen::Matrix<double, 7, 1> HenningImpedanceController::saturateTorqueRate(
@@ -408,6 +394,25 @@ Eigen::Matrix<double, 7, 1> HenningImpedanceController::saturateTorqueRate(
         
   y.resize(rows,cols);
   y << (1 - filter_param) * y_prev + filter_param * (input + input_prev) / 2;
+}
+
+void HenningImpedanceController::complianceParamCallback(
+    franka_example_controllers::compliance_paramConfig& config,
+    uint32_t /*level*/) {
+}
+
+void HenningImpedanceController::equilibriumPoseCallback(
+    const geometry_msgs::PoseStampedConstPtr& msg) {
+  std::lock_guard<std::mutex> position_d_target_mutex_lock(
+      position_and_orientation_d_target_mutex);
+  position_d_target << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
+  Eigen::Quaterniond last_orientation_d_target(orientation_d_target);
+  orientation_d_target.coeffs() << msg->pose.orientation.x, msg->pose.orientation.y,
+      msg->pose.orientation.z, msg->pose.orientation.w;
+  if (last_orientation_d_target.coeffs().dot(orientation_d_target.coeffs()) < 0.0) {
+    orientation_d_target.coeffs() << -orientation_d_target.coeffs();
+  }
+  std::cout << "equilibriumPoseCallback function used" << std::endl;
 }
 
 }  // namespace franka_example_controllers
