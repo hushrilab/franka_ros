@@ -106,7 +106,7 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
   M_d.setIdentity(); 
   
   M_d.diagonal() << 0.5, 0.5, 0.5, 0.5, 0.5, 0.5;
-  K_p.diagonal() << 100, 100, 100, 500, 300, 300;
+  K_p.diagonal() << 100, 100, 100, 300, 300, 300;
   K_d.diagonal() << 20, 20, 20, 10, 10, 10;
   
   // Nullspace stiffness and damping
@@ -227,7 +227,7 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
                         0.5;
 //  position_d_target << position_init;
   
-  angles_d <<  20  * M_PI/180 + M_PI,  // x-axis (roll)
+  angles_d <<  0  * M_PI/180 + M_PI,  // x-axis (roll)
                0  * M_PI/180,         // y-axis (pitch)
                0  * M_PI/180;         // z-axis (yaw) compared to base frame in intial position
 
