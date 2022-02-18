@@ -21,7 +21,7 @@
 #include <franka_hw/franka_state_interface.h>
 
 // #include <franka_example_controllers/pseudo_inversion.h>
-#include <franka/robot.h>
+// #include <franka/robot.h>
 
 namespace franka_example_controllers {
 
@@ -53,31 +53,24 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   double r {0.1};
   double omega {1};
   
-  double filter_params_{0.005};
-  double nullspace_stiffness_{2.0};
-  double nullspace_stiffness_target_{20.0};
+//   double filter_params_{0.005};
+//   double nullspace_stiffness_{2.0};
+//   double nullspace_stiffness_target_{20.0};
   const double delta_tau_max_{1.0};
-  Eigen::Matrix<double, 6, 6> K_cartesian;
-  Eigen::Matrix<double, 6, 6> cartesian_stiffness_target_;
-  Eigen::Matrix<double, 6, 6> D_cartesian;
-  Eigen::Matrix<double, 6, 6> cartesian_damping_target_;
-  Eigen::Matrix<double, 7, 1> q_d_nullspace_;
-  
-  // for PID controller
-  Eigen::Matrix<double, 6, 6> K_P;
-  Eigen::Matrix<double, 6, 6> K_D;
-  Eigen::Matrix<double, 6, 6> K_I;
-  Eigen::Matrix<double, 6, 1> eint;
-  
+//   Eigen::Matrix<double, 6, 6> K_cartesian;
+//   Eigen::Matrix<double, 6, 6> cartesian_stiffness_target_;
+//   Eigen::Matrix<double, 6, 6> D_cartesian;
+//   Eigen::Matrix<double, 6, 6> cartesian_damping_target_;
+//   
+  // Errors
+  Eigen::Matrix<double, 6, 1> error;
+  Eigen::Matrix<double, 6, 1> derror;
+  Eigen::Matrix<double, 6, 1> dderror;
+
   
   bool flag;
   Eigen::Matrix<double, 6, 6> Lambda;
-  Eigen::Matrix<double, 7, 6> J_plus;
-  Eigen::Matrix<double, 6, 7> J_T_plus;
-  Eigen::Matrix<double, 6, 6> S_P;
-  Eigen::Matrix<double, 6, 6> S_f;
   Eigen::Matrix<double, 7, 1> tau_0;
-  Eigen::Matrix<double, 7, 6> J_dash;
   Eigen::Matrix<double, 6, 1> f;
   
   Eigen::Matrix<double, 6, 6> K_p;
@@ -87,8 +80,8 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   Eigen::Matrix<double, 6, 6> I;
   Eigen::Matrix<double, 7, 7> K_N;
   Eigen::Matrix<double, 7, 7> D_N;
-  Eigen::Matrix<double, 7, 7> D_eta;
-  Eigen::Matrix<double, 7, 7> K_p0;
+//   Eigen::Matrix<double, 7, 7> D_eta;
+//   Eigen::Matrix<double, 7, 7> K_p0;
   Eigen::Matrix<double, 7, 1> q_nullspace;
   Eigen::Matrix<double, 7, 1> N;
   Eigen::Matrix<double, 6, 1> F_tau;
@@ -100,8 +93,6 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   Eigen::Matrix<double, 7, 1> dq_max;
   Eigen::Matrix<double, 7, 1> tau_max;
   Eigen::Matrix<double, 7, 1> tau_min;
-  
-
   
   // For filtering
   Eigen::Matrix<double, 6, 1> F_ext_filtered;
@@ -126,7 +117,7 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   Eigen::Vector3d omega_d_global;
   Eigen::Vector3d domega_d_local;
   Eigen::Vector3d domega_d_global;
-  std::mutex position_and_orientation_d_target_mutex;
+//   std::mutex position_and_orientation_d_target_mutex;
 //   Eigen::Vector3d position_d_target_;
 //   Eigen::Quaterniond orientation_d_target_;
 
@@ -134,12 +125,12 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   std::unique_ptr<dynamic_reconfigure::Server<franka_example_controllers::compliance_paramConfig>>
       dynamic_server_compliance_param_;
   ros::NodeHandle dynamic_reconfigure_compliance_param_node_;
-  void complianceParamCallback(franka_example_controllers::compliance_paramConfig& config,
-                               uint32_t level);
-
-  // Equilibrium pose subscriber
-  ros::Subscriber sub_equilibrium_pose_;
-  void equilibriumPoseCallback(const geometry_msgs::PoseStampedConstPtr& msg);
+//   void complianceParamCallback(franka_example_controllers::compliance_paramConfig& config,
+//                                uint32_t level);
+// 
+//   // Equilibrium pose subscriber
+//   ros::Subscriber sub_equilibrium_pose_;
+//   void equilibriumPoseCallback(const geometry_msgs::PoseStampedConstPtr& msg);
 };
 
 }  // namespace franka_example_controllers
