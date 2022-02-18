@@ -104,7 +104,7 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   double alpha, beta, gamma; // in degrees
   
   Eigen::Vector3d position_d;
-  Eigen::Vector3d position_d_target;
+  Eigen::Vector3d position_d_target_;
   Eigen::Vector3d position_init;
   Eigen::Vector3d angles_d;
   Eigen::Vector3d angles_init;
@@ -112,12 +112,12 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   Eigen::Vector3d acceleration_d;
   Eigen::Quaterniond orientation_d;
   Eigen::Quaterniond orientation_init;
-  Eigen::Quaterniond orientation_d_target;
+  Eigen::Quaterniond orientation_d_target_;
   Eigen::Vector3d omega_d_local;
   Eigen::Vector3d omega_d_global;
   Eigen::Vector3d domega_d_local;
   Eigen::Vector3d domega_d_global;
-//   std::mutex position_and_orientation_d_target_mutex;
+  std::mutex position_and_orientation_d_target_mutex_;
 //   Eigen::Vector3d position_d_target_;
 //   Eigen::Quaterniond orientation_d_target_;
 
@@ -128,9 +128,9 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
 //   void complianceParamCallback(franka_example_controllers::compliance_paramConfig& config,
 //                                uint32_t level);
 // 
-//   // Equilibrium pose subscriber
-//   ros::Subscriber sub_equilibrium_pose_;
-//   void equilibriumPoseCallback(const geometry_msgs::PoseStampedConstPtr& msg);
+  // Equilibrium pose subscriber
+  ros::Subscriber sub_equilibrium_pose_;
+  void equilibriumPoseCallback(const geometry_msgs::PoseStampedConstPtr& msg);
 };
 
 }  // namespace franka_example_controllers

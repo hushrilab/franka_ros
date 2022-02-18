@@ -19,9 +19,9 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
 //   std::vector<double> cartesian_stiffness_vector;
 //   std::vector<double> cartesian_damping_vector;
 
-//   sub_equilibrium_pose_ = node_handle.subscribe(
-//       "equilibrium_pose", 20, &HenningImpedanceController::equilibriumPoseCallback, this,
-//       ros::TransportHints().reliable().tcpNoDelay());
+  sub_equilibrium_pose_ = node_handle.subscribe(
+      "equilibrium_pose", 20, &HenningImpedanceController::equilibriumPoseCallback, this,
+      ros::TransportHints().reliable().tcpNoDelay());
 
   std::string arm_id;
   if (!node_handle.getParam("arm_id", arm_id)) {
@@ -96,8 +96,8 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
   // Variable Initialization
   position_d.setZero();
   orientation_d.coeffs() << 0.0, 0.0, 0.0, 1.0;
-  position_d_target.setZero();
-  orientation_d_target.coeffs() << 0.0, 0.0, 0.0, 1.0;  
+  position_d_target_.setZero();
+  orientation_d_target_.coeffs() << 0.0, 0.0, 0.0, 1.0;  
   
   error.setZero();
   derror.setZero();
@@ -226,9 +226,9 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 
 //  // Point to Point movements
 
-   position_d_target << 0.4, 0, 0.5;
+   position_d_target_ << 0.4, 0, 0.5;
                         
-//   position_d_target << position_init;
+//   position_d_target_ << position_init;
                         
   velocity_d.setZero();
   acceleration_d.setZero();
@@ -237,7 +237,7 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
                0  * M_PI/180,         // y-axis (pitch)
                0  * M_PI/180;         // z-axis (yaw) compared to base frame in intial position
 
-  orientation_d_target =    Eigen::AngleAxisd(angles_d(0), Eigen::Vector3d::UnitX())
+  orientation_d_target_ =    Eigen::AngleAxisd(angles_d(0), Eigen::Vector3d::UnitX())
                           * Eigen::AngleAxisd(angles_d(1), Eigen::Vector3d::UnitY())
                           * Eigen::AngleAxisd(angles_d(2), Eigen::Vector3d::UnitZ()); 
                           
@@ -246,11 +246,11 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   
   
   // Damp the motion between the points
-  double motion_damp = 0.005;   /*((position_d_target - position_init).norm() - (position_d_target - curr_position).norm()); */  // or just motion damp = 0.0008;
+  double motion_damp = 0.005;   /*((position_d_target_ - position_init).norm() - (position_d_target_ - curr_position).norm()); */  // or just motion damp = 0.0008;
 
-  position_d << motion_damp * position_d_target + (1.0 - motion_damp) * position_d;                       
+  position_d << motion_damp * position_d_target_ + (1.0 - motion_damp) * position_d;                       
   
-  orientation_d = orientation_d.slerp(0.005, orientation_d_target);
+  orientation_d = orientation_d.slerp(0.005, orientation_d_target_);
                           
 // For time dependent Trajectoires
   
@@ -373,8 +373,8 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
     joint_handles_[i].setCommand(tau_d(i));
   }
   
-//   std::lock_guard<std::mutex> position_d_target_mutex_lock(
-//       position_and_orientation_d_target_mutex);
+  std::lock_guard<std::mutex> position_d_target__mutex_lock(
+      position_and_orientation_d_target_mutex_);
   
 //     std::cout << "Error" <<std::endl<< error <<std::endl; 
 
@@ -419,6 +419,20 @@ Eigen::Matrix<double, 7, 1> HenningImpedanceController::saturateTorqueRate(
   y.resize(rows,cols);
   y << (1 - filter_param) * y_prev + filter_param * (input + input_prev) / 2;
 }
+
+void HenningImpedanceController::equilibriumPoseCallback(
+    const geometry_msgs::PoseStampedConstPtr& msg) {
+  std::lock_guard<std::mutex> position_d_target_mutex_lock(
+      position_and_orientation_d_target_mutex_);
+  position_d_target_ << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
+  Eigen::Quaterniond last_orientation_d_target(orientation_d_target_);
+  orientation_d_target_.coeffs() << msg->pose.orientation.x, msg->pose.orientation.y,
+      msg->pose.orientation.z, msg->pose.orientation.w;
+  if (last_orientation_d_target.coeffs().dot(orientation_d_target_.coeffs()) < 0.0) {
+    orientation_d_target_.coeffs() << -orientation_d_target_.coeffs();
+  }
+}
+
 
 }  // namespace franka_example_controllers
 
