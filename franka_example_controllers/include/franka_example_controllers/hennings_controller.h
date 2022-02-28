@@ -20,9 +20,6 @@
 #include <franka_hw/franka_model_interface.h>
 #include <franka_hw/franka_state_interface.h>
 
-// #include <franka_example_controllers/pseudo_inversion.h>
-// #include <franka/robot.h>
-
 namespace franka_example_controllers {
 
 class HenningImpedanceController : public controller_interface::MultiInterfaceController<
@@ -53,15 +50,8 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   double r {0.1};
   double omega {1};
   
-//   double filter_params_{0.005};
-//   double nullspace_stiffness_{2.0};
-//   double nullspace_stiffness_target_{20.0};
-  const double delta_tau_max_{1.0};
-//   Eigen::Matrix<double, 6, 6> K_cartesian;
-//   Eigen::Matrix<double, 6, 6> cartesian_stiffness_target_;
-//   Eigen::Matrix<double, 6, 6> D_cartesian;
-//   Eigen::Matrix<double, 6, 6> cartesian_damping_target_;
-//   
+  const double delta_tau_max_{1.0};   
+  
   // Errors
   Eigen::Matrix<double, 6, 1> error;
   Eigen::Matrix<double, 6, 1> derror;
@@ -72,16 +62,21 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   Eigen::Matrix<double, 6, 6> Lambda;
   Eigen::Matrix<double, 7, 1> tau_0;
   Eigen::Matrix<double, 6, 1> f;
+
+  Eigen::Matrix<double, 6, 1> desired_force;
+  Eigen::Matrix<double, 7, 1> tau_force;
+  Eigen::Matrix<double, 6, 1> force_control;
+  Eigen::Matrix<double, 6, 1> force_error;
   
   Eigen::Matrix<double, 6, 6> K_p;
   Eigen::Matrix<double, 6, 6> K_d;
   Eigen::Matrix<double, 6, 6> M_d;
+  Eigen::Matrix<double, 6, 6> K_p_f;
+  Eigen::Matrix<double, 6, 6> K_i_f;
   Eigen::Matrix<double, 6, 6> M_r;
   Eigen::Matrix<double, 6, 6> I;
   Eigen::Matrix<double, 7, 7> K_N;
   Eigen::Matrix<double, 7, 7> D_N;
-//   Eigen::Matrix<double, 7, 7> D_eta;
-//   Eigen::Matrix<double, 7, 7> K_p0;
   Eigen::Matrix<double, 7, 1> q_nullspace;
   Eigen::Matrix<double, 7, 1> N;
   Eigen::Matrix<double, 6, 1> F_tau;
@@ -104,7 +99,7 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   double alpha, beta, gamma; // in degrees
   
   Eigen::Vector3d position_d;
-  Eigen::Vector3d position_d_target_;
+  Eigen::Vector3d position_d_target;
   Eigen::Vector3d position_init;
   Eigen::Vector3d angles_d;
   Eigen::Vector3d angles_init;
@@ -112,7 +107,7 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   Eigen::Vector3d acceleration_d;
   Eigen::Quaterniond orientation_d;
   Eigen::Quaterniond orientation_init;
-  Eigen::Quaterniond orientation_d_target_;
+  Eigen::Quaterniond orientation_d_target;
   Eigen::Vector3d omega_d_local;
   Eigen::Vector3d omega_d_global;
   Eigen::Vector3d domega_d_local;

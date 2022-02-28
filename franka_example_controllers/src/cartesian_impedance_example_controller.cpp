@@ -147,6 +147,13 @@ void CartesianImpedanceExampleController::update(const ros::Time& /*time*/,
 
   // compute error to desired pose
   // position error
+  
+//   position_d_target_ << 0.4, 0, 0.5;
+//   
+//   orientation_d_target_ =   Eigen::AngleAxisd(0  * M_PI/180 + M_PI, Eigen::Vector3d::UnitX())
+//                           * Eigen::AngleAxisd(0  * M_PI/180, Eigen::Vector3d::UnitY())
+//                           * Eigen::AngleAxisd(0  * M_PI/180, Eigen::Vector3d::UnitZ());
+  
   Eigen::Matrix<double, 6, 1> error;
   error.head(3) << position - position_d_;
 
