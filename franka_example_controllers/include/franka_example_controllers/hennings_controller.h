@@ -81,6 +81,8 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   Eigen::Matrix<double, 7, 1> N;
   Eigen::Matrix<double, 6, 1> F_tau;
   Eigen::Matrix<double, 6, 7> djacobian;
+  Eigen::Matrix<double, 6, 7> djacobian_prev;
+  Eigen::Matrix<double, 6, 7> djacobian_filtered;
   Eigen::Matrix<double, 6, 7> jacobian_prev;
   Eigen::Matrix<double, 7, 1> dq_prev;
   Eigen::Matrix<double, 7, 1> ddq;

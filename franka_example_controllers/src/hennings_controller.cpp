@@ -108,8 +108,8 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
 //   M_d.setIdentity(); 
   
   M_d.diagonal() << 0.5, 0.5, 0.5, 0.5, 0.5, 0.5;
-  K_p.diagonal() << 100, 100, 100, 100, 100, 100;
-  K_d.diagonal() << 20, 20, 20, 20, 20, 20;
+  K_p.diagonal() << 400, 300, 300, 12, 12, 5;
+  K_d.diagonal() << 20, 20, 20, 1, 1, 0.5;
   
   // Nullspace stiffness and damping
   K_N.setIdentity();
@@ -144,6 +144,9 @@ void HenningImpedanceController::starting(const ros::Time& /*time*/) {
   Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
   jacobian_prev << jacobian;
   
+  djacobian_prev.setZero();
+  djacobian.setZero();
+  
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(initial_state.dq.data());
   dq_prev << dq;
   ddq_filtered << dq;
@@ -159,18 +162,6 @@ void HenningImpedanceController::starting(const ros::Time& /*time*/) {
   orientation_d = orientation_init;
   position_d_target << position_init; 
   orientation_d_target = orientation_init;
-  
-  angles_init << orientation_init.toRotationMatrix().eulerAngles(0, 1, 2);
-   std::cout<<std::endl<< "Angles" << std::endl << angles_init << std::endl;
-   std::cout<<"w" << std::endl<<orientation_d.w()<<std::endl;
-    std::cout<<"x" << std::endl<<orientation_d.x()<<std::endl;
-     std::cout<<"y" << std::endl<<orientation_d.y()<<std::endl;
-      std::cout<<"z" << std::endl<<orientation_d.z()<<std::endl;
-   std::cout<<"Initial Pos" << std::endl<<position_init<<std::endl;
-
-  Eigen::Map<Eigen::Matrix<double, 6, 1>> F_ext(initial_state.O_F_ext_hat_K.data());
-  F_ext_prev << F_ext;
-  F_ext_filtered << F_ext;
   
   // set nullspace equilibrium configuration to initial q
   q_nullspace = q_initial;
@@ -192,7 +183,6 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   Eigen::Map<Eigen::Matrix<double, 7, 1>> gravity(gravity_array.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> q(robot_state.q.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(robot_state.dq.data());
-  Eigen::Map<Eigen::Matrix<double, 6, 1>> F_ext(robot_state.O_F_ext_hat_K.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> tau_J_d(  // NOLINT (readability-identifier-naming)
       robot_state.tau_J_d.data());
       
@@ -210,11 +200,12 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   }
   // Filter signals
   Eigen::MatrixXd y(7,7);
-  Filter(0.001, F_ext.rows(), F_ext.cols(), F_ext, F_ext_prev, F_ext_filtered, y);
-  F_ext_filtered << y;
   
   Filter(0.001, ddq.rows(), ddq.cols(), ddq, ddq_prev, ddq_filtered, y);
   ddq_filtered << y;
+  
+  Filter(0.001, djacobian.rows(), djacobian.cols(), djacobian, djacobian_prev, djacobian_filtered, y);
+  djacobian_filtered << y;
 
   
   Eigen::Affine3d transform(Eigen::Matrix4d::Map(robot_state.O_T_EE.data()));
@@ -225,13 +216,13 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   curr_velocity << jacobian * dq;
   
   Eigen::VectorXd curr_acceleration(6);
-  curr_acceleration << jacobian * ddq_filtered + djacobian * dq;
+  curr_acceleration << jacobian * ddq_filtered + djacobian_filtered * dq;
   
 //  //desired position and velocity
 
 //  // Point to Point movements
 
-  position_d_target << 0.4, 0, 0.5;
+  position_d_target << 0.3, 0.3, 0.5;
                         
 //   position_d_target << position_init;
                         
@@ -239,7 +230,7 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   acceleration_d.setZero();
   
   angles_d <<  0  * M_PI/180 + M_PI,  // x-axis (roll) (points forward)
-               45  * M_PI/180,         // y-axis (pitch) (points to the right)
+               0  * M_PI/180,         // y-axis (pitch) (points to the right)
                0  * M_PI/180;         // z-axis (yaw) compared to base frame in intial position (points downwards)
 
   orientation_d_target =    Eigen::AngleAxisd(angles_d(0), Eigen::Vector3d::UnitX())
@@ -251,50 +242,19 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   
   // Damp the motion between the points
 
-  double motion_damp = 0.003;   /*((position_d_target - position_init).norm() - (error.head(3)).norm()); */  // or just motion damp = 0.0008;
+  double motion_damp = 0.001;   /*((position_d_target - position_init).norm() - (error.head(3)).norm()); */  // or just motion damp = 0.0008;
 
   position_d << motion_damp * position_d_target + (1.0 - motion_damp) * position_d;                       
   
   orientation_d = orientation_d.slerp(motion_damp, orientation_d_target);
-                          
-// For time dependent Trajectoires
-  
-//   velocity_d.setZero();
-//   acceleration_d.setZero();
-//   position_d << position_init(0) + velocity_d(0) * time.toSec() + 0.5 * acceleration_d(0) * time.toSec() * time.toSec(),
-//                 position_init(1) + velocity_d(1) * time.toSec() + 0.5 * acceleration_d(1) * time.toSec() * time.toSec(), 
-//                 position_init(2) + velocity_d(2) * time.toSec() + 0.5 * acceleration_d(2) * time.toSec() * time.toSec();
-  
+                           
 // Circular Motion
   
 //   position_d <<  r * cos(omega * time.toSec()) + position_init(0) - r,
 //                  r * sin(omega * time.toSec()) + position_init(1), 
 //                  position_init(2);
 //             
-//                  
-//   velocity_d <<  -r * omega * sin(omega * time.toSec()), 
-//                   r * omega * cos(omega * time.toSec()),
-//                   0;
-//                   
-//   acceleration_d <<  -r * omega * omega * cos(omega * time.toSec()), 
-//                      -r * omega * omega * sin(omega * time.toSec()), 
-//                       0;
-//                       
-//   omega_d_global.setZero();
-//   domega_d_global.setZero();
-//   
-//   alpha = 0 + omega_d_global(0) * time.toSec() + 0.5 * domega_d_global(0) * time.toSec() * time.toSec();   // x-axis (roll)
-//   beta  = 0 + omega_d_global(1) * time.toSec() + 0.5 * domega_d_global(1) * time.toSec() * time.toSec();   // y-axis (pitch)
-//   gamma = 0 + omega_d_global(2) * time.toSec() + 0.5 * domega_d_global(2) * time.toSec() * time.toSec();   // z-axis (yaw) 
-//   
-//   angles_d <<  M_PI + M_PI/180 * alpha, 
-//                     + M_PI/180 * beta,
-//                     + M_PI/180 * gamma;
-// 
-//   orientation_d =    Eigen::AngleAxisd(angles_d(0), Eigen::Vector3d::UnitX())
-//                    * Eigen::AngleAxisd(angles_d(1), Eigen::Vector3d::UnitY())
-//                    * Eigen::AngleAxisd(angles_d(2), Eigen::Vector3d::UnitZ());              
-//                
+//                             
   
   Eigen::VectorXd ddx(6);
   ddx.setZero();
@@ -340,38 +300,49 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   
 // Comment: Works good but cannot find the optimal nullspace joint angles
   
- 
-//    std::cout <<"External Force:"<<std::endl<< F_ext_filtered <<std::endl;
-//    F_ext_filtered.setZero();
+
+//   Lambda << (jacobian * mass_inv * jacobian.transpose()).inverse();
+//    
+//   F_tau <<    Lambda * ddx - Lambda * M_d.inverse() * (K_d * derror + K_p * error)
+//            -  Lambda * djacobian_filtered * dq;
+//            
+// //   F_tau <<   -(K_d * derror + K_p * error);
+//    
+//   tau_task << jacobian.transpose() * F_tau;
+//   
+//   // nullspace PD control
+//  
+//   tau_nullspace << -K_N * (q - q_nullspace) - D_N * dq;
+//      
+//   N << Eigen::MatrixXd::Identity(7, 7) - jacobian.transpose() * Lambda * jacobian * mass_inv;
+//   
+//   // Desired torque
+//   tau_d << tau_task + coriolis + N * tau_nullspace;
+//   
+//   q_nullspace << q;
   
-
-//         // FORCE CONTROL
-
-//         desired_force.setZero();
-//         force_error = force_error + period.toSec() * (desired_force - F_ext_filtered /*+ force_ext_initial_*/);
-//         force_control = (desired_force + K_p_f * (desired_force - F_ext_filtered /*+ force_ext_initial_*/) + K_i_f * force_error);
-//         
-//         // FF + PI control
-//         tau_force = jacobian.transpose() * force_control;
-
-  Lambda << (jacobian * mass_inv * jacobian.transpose()).inverse();
-   
-  F_tau <<    Lambda * ddx - Lambda * M_d.inverse() * (K_d * derror + K_p * error) 
-           + (Lambda * M_d.inverse() - Eigen::MatrixXd::Identity(6, 6)) * F_ext_filtered 
-           -  Lambda * djacobian * dq;
-   
-  tau_task << jacobian.transpose() * F_tau;
   
-  // nullspace PD control
- 
-  tau_nullspace << -K_N * (q - q_nullspace) - D_N * dq;
-     
-  N << Eigen::MatrixXd::Identity(7, 7) - jacobian.transpose() * Lambda * jacobian * mass_inv;
+  // // ///////////////////  Paper: Multiple priority impedance control       /////////////////////////
+// // ///////////////////                  Robert Platt Jr                  //////////////////////// 
+  
+// Comment:
+  
+  Eigen::MatrixXd J_W(7,6) , W(7,7), N_W(7,7);
+  
+  W.setIdentity();
+  
+  J_W << W.inverse() * jacobian.transpose() * (jacobian * W.inverse() * jacobian.transpose()).inverse();
+  
+  N_W << Eigen::MatrixXd::Identity(7, 7) - J_W * jacobian;
+  
+  tau_nullspace << K_N * (q - q_nullspace) + D_N * dq;
+  
+  tau_task = mass * J_W *(ddx + M_d.inverse() * (- K_d * derror - K_p * error) - djacobian * dq) + mass * N_W * M_d.inverse() * (-tau_nullspace);
   
   // Desired torque
-  tau_d << tau_task + coriolis + N * tau_nullspace;
+  tau_d << tau_task + coriolis;
   
-  q_nullspace << q;
+//   q_nullspace << q;
  
 /////////////////////////////////////////// end of controller ///////////////////////////////////////////////  
   
@@ -403,7 +374,7 @@ for (size_t i = 0; i < 7; ++i) {
   // Update values
   
   jacobian_prev << jacobian;
-  F_ext_prev << F_ext;
+  djacobian_prev << djacobian;
   ddq_prev << ddq;
   dq_prev << dq;
   flag = false;
