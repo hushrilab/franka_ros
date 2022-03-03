@@ -222,7 +222,7 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 
 //  // Point to Point movements
 
-  position_d_target << 0.3, 0.3, 0.5;
+  position_d_target << 0.4, 0, 0.5;
                         
 //   position_d_target << position_init;
                         
@@ -301,48 +301,25 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 // Comment: Works good but cannot find the optimal nullspace joint angles
   
 
-//   Lambda << (jacobian * mass_inv * jacobian.transpose()).inverse();
-//    
-//   F_tau <<    Lambda * ddx - Lambda * M_d.inverse() * (K_d * derror + K_p * error)
-//            -  Lambda * djacobian_filtered * dq;
-//            
-// //   F_tau <<   -(K_d * derror + K_p * error);
-//    
-//   tau_task << jacobian.transpose() * F_tau;
-//   
-//   // nullspace PD control
-//  
-//   tau_nullspace << -K_N * (q - q_nullspace) - D_N * dq;
-//      
-//   N << Eigen::MatrixXd::Identity(7, 7) - jacobian.transpose() * Lambda * jacobian * mass_inv;
-//   
-//   // Desired torque
-//   tau_d << tau_task + coriolis + N * tau_nullspace;
-//   
-//   q_nullspace << q;
+  Lambda << (jacobian * mass_inv * jacobian.transpose()).inverse();
+   
+  F_tau <<    Lambda * ddx - Lambda * M_d.inverse() * (K_d * derror + K_p * error)
+           -  Lambda * djacobian_filtered * dq;
+           
+//   F_tau <<   -(K_d * derror + K_p * error);
+   
+  tau_task << jacobian.transpose() * F_tau;
   
-  
-  // // ///////////////////  Paper: Multiple priority impedance control       /////////////////////////
-// // ///////////////////                  Robert Platt Jr                  //////////////////////// 
-  
-// Comment:
-  
-  Eigen::MatrixXd J_W(7,6) , W(7,7), N_W(7,7);
-  
-  W.setIdentity();
-  
-  J_W << W.inverse() * jacobian.transpose() * (jacobian * W.inverse() * jacobian.transpose()).inverse();
-  
-  N_W << Eigen::MatrixXd::Identity(7, 7) - J_W * jacobian;
-  
-  tau_nullspace << K_N * (q - q_nullspace) + D_N * dq;
-  
-  tau_task = mass * J_W *(ddx + M_d.inverse() * (- K_d * derror - K_p * error) - djacobian * dq) + mass * N_W * M_d.inverse() * (-tau_nullspace);
+  // nullspace PD control
+ 
+  tau_nullspace << -K_N * (q - q_nullspace) - D_N * dq;
+     
+  N << Eigen::MatrixXd::Identity(7, 7) - jacobian.transpose() * Lambda * jacobian * mass_inv;
   
   // Desired torque
-  tau_d << tau_task + coriolis;
+  tau_d << tau_task + coriolis + N * tau_nullspace;
   
-//   q_nullspace << q;
+  q_nullspace << q;
  
 /////////////////////////////////////////// end of controller ///////////////////////////////////////////////  
   
