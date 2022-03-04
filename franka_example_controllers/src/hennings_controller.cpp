@@ -104,11 +104,11 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
 //   For Impedance Controller
   
   M_d.diagonal() << 0.2, 0.2, 0.2, 0.2, 0.2, 0.2;
-  K_p.diagonal() << 500, 400, 400, 50, 50, 50;
+  K_p.diagonal() << 500, 500, 400, 50, 50, 50;
   K_d.diagonal() << 30, 30, 30, 3, 3, 3;
   
 // For the easiest controller  
-//   K_p.diagonal() << 500, 400, 400, 18, 18, 8;
+//   K_p.diagonal() << 500, 500, 400, 18, 18, 8;
 //   K_d.diagonal() << 30, 30, 30, 0.3, 0.3, 0.3;
   
   // Nullspace stiffness and damping
@@ -296,11 +296,12 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 
   Lambda << (jacobian * mass_inv * jacobian.transpose()).inverse();
   if (flag) {
-        Lambda_prev << Lambda;
+        C_hat.setZero();
   }
+  else {
+    C_hat << 0.5 * (Lambda - Lambda_prev) / period.toSec();
+  } 
   
-  C_hat << 0.5 * (Lambda - Lambda_prev) / period.toSec();
-   
   F_tau <<    Lambda * ddx - K_d * derror - K_p * error - C_hat * derror - Lambda * djacobian_filtered * dq;
   
 //   F_tau <<    Lambda.inverse() * ddx - Lambda.inverse() * M_d.inverse() * (K_d * derror + K_p * error) - Lambda * djacobian_filtered * dq;
