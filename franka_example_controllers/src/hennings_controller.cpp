@@ -205,19 +205,11 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   Eigen::VectorXd curr_velocity(6);
   curr_velocity << jacobian * dq;
   
-  Eigen::VectorXd curr_acceleration(6);
-  curr_acceleration << jacobian * ddq_filtered + djacobian_filtered * dq;
-  
 //  //desired position and velocity
 
 //  // Point to Point movements
 
-  position_d_target << 0.4, 0, 0.5;
-                        
-//   position_d_target << position_init;
-                        
-  velocity_d.setZero();
-  acceleration_d.setZero();
+  position_d_target << 0.0, 0, 0.7;
   
   angles_d <<  0  * M_PI/180 + M_PI,  // x-axis (roll) (points forward)
                0  * M_PI/180,         // y-axis (pitch) (points to the right)
@@ -230,11 +222,35 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   omega_d_global.setZero();
   domega_d_global.setZero();
   
+  // Trajectory planning 
+  
+  // Point to Point
+  
+  double T = 10;
+  
+  double a3 = 10 / pow(T, 3);
+  double a4 = - 15 / pow(T, 4);
+  double a5 = 6 / pow(T, 5);
+  
+  double s = a3 * pow(time.toSec(), 3) + a4 * pow(time.toSec(), 4) + a5 * pow(time.toSec(), 5);
+  double ds = 3 * a3 * pow(time.toSec(), 2) + 4 * a4 * pow(time.toSec(), 3) + 5 * a5 * pow(time.toSec(), 4);
+  double dds = 6 * a3 * time.toSec() + 12 * a4 * pow(time.toSec(), 2) + 20 * a5 * pow(time.toSec(), 3);
+  
+  if (s <= 1) {
+    position_d << position_init + s * (position_d_target - position_init);
+    velocity_d << ds * (position_d_target - position_init);
+    acceleration_d << dds * (position_d_target - position_init);
+  }
+  
+  else {
+    position_d << position_d_target;
+    velocity_d.setZero();
+    acceleration_d.setZero();
+  }
+
   // Damp the motion between the points
 
-  double motion_damp = 0.001;   /*((position_d_target - position_init).norm() - (error.head(3)).norm()); */  // or just motion damp = 0.0008;
-
-  position_d << motion_damp * position_d_target + (1.0 - motion_damp) * position_d;                       
+  double motion_damp = 0.001;                     
   
   orientation_d = orientation_d.slerp(motion_damp, orientation_d_target);
                            
