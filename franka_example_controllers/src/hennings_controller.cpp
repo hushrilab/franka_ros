@@ -14,8 +14,6 @@ namespace franka_example_controllers {
 
 bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
                                                ros::NodeHandle& node_handle) {
-//   std::vector<double> cartesian_stiffness_vector;
-//   std::vector<double> cartesian_damping_vector;
 
   sub_equilibrium_pose_ = node_handle.subscribe(
       "equilibrium_pose", 20, &HenningImpedanceController::equilibriumPoseCallback, this,
@@ -85,12 +83,6 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
   dynamic_reconfigure_compliance_param_node_ =
       ros::NodeHandle(node_handle.getNamespace() + "dynamic_reconfigure_compliance_param_node");
 
-//   dynamic_server_compliance_param_ = std::make_unique<
-//       dynamic_reconfigure::Server<franka_example_controllers::compliance_paramConfig>>(
-//       dynamic_reconfigure_compliance_param_node_);
-//   dynamic_server_compliance_param_->setCallback(
-//       boost::bind(&HenningImpedanceController::complianceParamCallback, this, _1, _2));
-
   // Variable Initialization
   position_d.setZero();
   orientation_d.coeffs() << 0.0, 0.0, 0.0, 1.0;
@@ -102,10 +94,15 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
   dderror.setZero();
   
 //   For Impedance Controller
+    
+// for Controller without F_ext  
+  K_p.diagonal() << 600, 600, 600, 30, 30, 10;
+  K_d.diagonal() << 30, 30, 30, 1.5, 1.5, 1.5;
   
-  M_d.diagonal() << 0.2, 0.2, 0.2, 0.2, 0.2, 0.2;
-  K_p.diagonal() << 500, 500, 400, 50, 50, 50;
-  K_d.diagonal() << 30, 30, 30, 3, 3, 3;
+// for controller with F_ext
+//   M_d.diagonal() << 0.2, 0.2, 0.2, 0.2, 0.2, 0.2;
+//   K_p.diagonal() << 50, 50, 50, 100, 100, 100;
+//   K_d.diagonal() << 25, 25, 25, 30, 30, 30;  
   
 // For the easiest controller  
 //   K_p.diagonal() << 500, 500, 400, 18, 18, 8;
@@ -264,7 +261,7 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
     curr_orientation.coeffs() << -curr_orientation.coeffs(); // take short way around the circle and by using positve dot product of quaternions
   }
   
-   // orientation Error According to Silciano
+   // orientation Error (According to Silciano)
   
   Eigen::Vector3d quat_d, quat_c;
   
@@ -295,6 +292,7 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   
 
   Lambda << (jacobian * mass_inv * jacobian.transpose()).inverse();
+  
   if (flag) {
         C_hat.setZero();
   }
@@ -332,11 +330,11 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   std::lock_guard<std::mutex> position_d_target_mutex_lock(
       position_and_orientation_d_target_mutex_);
   
-//     std::cout << "Error" <<std::endl<< error <<std::endl; 
+  std::cout << "Error" <<std::endl<< error * 1000 <<std::endl; 
 
 // Compare all values
 
-for (size_t i = 0; i < 7; ++i) {
+  for (size_t i = 0; i < 7; ++i) {
     if (std::abs(tau_d[i]) > tau_max[i]) {
         std::cout << "Error: Torque at joint: "<< i <<" is too big!! ("<< tau_d[i] <<" Nm)"<<std::endl;
     }
@@ -370,7 +368,7 @@ Eigen::Matrix<double, 7, 1> HenningImpedanceController::saturateTorqueRate(
   return tau_d_saturated;
 }
   
-  void HenningImpedanceController::Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input, 
+void HenningImpedanceController::Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input, 
   const Eigen::MatrixXd& input_prev,  const Eigen::MatrixXd& y_prev,   Eigen::MatrixXd& y) {
         
   y.resize(rows,cols);
