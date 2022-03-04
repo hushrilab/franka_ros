@@ -60,6 +60,8 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   
   bool flag;
   Eigen::Matrix<double, 6, 6> Lambda;
+  Eigen::Matrix<double, 6, 6> Lambda_prev;
+  Eigen::Matrix<double, 6, 6> C_hat;
   Eigen::Matrix<double, 7, 1> tau_0;
   Eigen::Matrix<double, 6, 1> f;
 

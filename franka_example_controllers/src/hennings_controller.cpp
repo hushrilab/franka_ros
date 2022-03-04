@@ -103,24 +103,19 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
   
 //   For Impedance Controller
   
-//   K_p.setIdentity(); 
-//   K_d.setIdentity(); 
-//   M_d.setIdentity(); 
+  M_d.diagonal() << 0.2, 0.2, 0.2, 0.2, 0.2, 0.2;
+  K_p.diagonal() << 500, 400, 400, 50, 50, 50;
+  K_d.diagonal() << 30, 30, 30, 3, 3, 3;
   
-  M_d.diagonal() << 0.5, 0.5, 0.5, 0.5, 0.5, 0.5;
-  K_p.diagonal() << 400, 300, 300, 12, 12, 5;
-  K_d.diagonal() << 20, 20, 20, 1, 1, 0.5;
+// For the easiest controller  
+//   K_p.diagonal() << 500, 400, 400, 18, 18, 8;
+//   K_d.diagonal() << 30, 30, 30, 0.3, 0.3, 0.3;
   
   // Nullspace stiffness and damping
   K_N.setIdentity();
   D_N.setIdentity();
   K_N << K_N * 15;
   D_N << D_N * 0.5 * sqrt(K_N(0,0));  
-  
-  // Force Control
-  K_p_f.diagonal() << 100, 100, 100, 100, 100, 100;
-  K_i_f.diagonal() << 1, 1, 1, 1, 1, 1;
-  force_error.setZero();
   
   // To check max values
   ddq_max << 15, 7.5, 10, 12.5, 15, 20, 20;
@@ -174,13 +169,11 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   std::array<double, 7> coriolis_array = model_handle_->getCoriolis();
   std::array<double, 42> jacobian_array = model_handle_->getZeroJacobian(franka::Frame::kEndEffector);
   std::array<double, 49> mass_array = model_handle_->getMass();
-  std::array<double, 7> gravity_array = model_handle_->getGravity();
   
   // convert to Eigen
   Eigen::Map<Eigen::Matrix<double, 7, 7>> mass(mass_array.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> coriolis(coriolis_array.data());
   Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
-  Eigen::Map<Eigen::Matrix<double, 7, 1>> gravity(gravity_array.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> q(robot_state.q.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(robot_state.dq.data());
   Eigen::Map<Eigen::Matrix<double, 7, 1>> tau_J_d(  // NOLINT (readability-identifier-naming)
@@ -302,11 +295,17 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   
 
   Lambda << (jacobian * mass_inv * jacobian.transpose()).inverse();
+  if (flag) {
+        Lambda_prev << Lambda;
+  }
+  
+  C_hat << 0.5 * (Lambda - Lambda_prev) / period.toSec();
    
-  F_tau <<    Lambda * ddx - Lambda * M_d.inverse() * (K_d * derror + K_p * error)
-           -  Lambda * djacobian_filtered * dq;
+  F_tau <<    Lambda * ddx - K_d * derror - K_p * error - C_hat * derror - Lambda * djacobian_filtered * dq;
+  
+//   F_tau <<    Lambda.inverse() * ddx - Lambda.inverse() * M_d.inverse() * (K_d * derror + K_p * error) - Lambda * djacobian_filtered * dq;
            
-//   F_tau <<   -(K_d * derror + K_p * error);
+//    F_tau <<   -(K_d * derror + K_p * error);
    
   tau_task << jacobian.transpose() * F_tau;
   
@@ -352,6 +351,7 @@ for (size_t i = 0; i < 7; ++i) {
   
   jacobian_prev << jacobian;
   djacobian_prev << djacobian;
+  Lambda_prev << Lambda;
   ddq_prev << ddq;
   dq_prev << dq;
   flag = false;
