@@ -40,6 +40,8 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   // Filter
     void Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input,  const Eigen::MatrixXd& input_prev,
     const Eigen::MatrixXd& y_prev,  Eigen::MatrixXd& y);  // NOLINT (readability-identifier-naming)  
+    
+    template<typename M> M load_csv (const std::string & path);
 
   std::unique_ptr<franka_hw::FrankaStateHandle> state_handle_;
   std::unique_ptr<franka_hw::FrankaModelHandle> model_handle_;

@@ -10,6 +10,8 @@
 #include <pluginlib/class_list_macros.h>
 #include <ros/ros.h>
 
+#include <fstream>
+
 namespace franka_example_controllers {
 
 bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
@@ -247,7 +249,15 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
     velocity_d.setZero();
     acceleration_d.setZero();
   }
+  
+  // Load matrices
+  Eigen::MatrixXd X = load_csv<Eigen::MatrixXd>("/home/airlab/Documents/Panda_Traj_Exports/x.csv");
+  Eigen::MatrixXd dX = load_csv<Eigen::MatrixXd>("/home/airlab/Documents/Panda_Traj_Exports/dx.csv");
+  Eigen::MatrixXd ddX = load_csv<Eigen::MatrixXd>("/home/airlab/Documents/Panda_Traj_Exports/ddx.csv");
 
+  if (flag) { 
+    std::cout<<X<<std::endl;
+  }
   // Damp the motion between the points
 
   double motion_damp = 0.001;                     
@@ -346,7 +356,7 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   std::lock_guard<std::mutex> position_d_target_mutex_lock(
       position_and_orientation_d_target_mutex_);
   
-  std::cout << "Error" <<std::endl<< error * 1000 <<std::endl; 
+ // std::cout << "Error" <<std::endl<< error * 1000 <<std::endl; 
 
 // Compare all values
 
@@ -389,6 +399,24 @@ void HenningImpedanceController::Filter(double filter_param, int rows, int cols,
         
   y.resize(rows,cols);
   y << (1 - filter_param) * y_prev + filter_param * (input + input_prev) / 2;
+}
+
+// Function to lad csv files; Source: https://stackoverflow.com/questions/34247057/how-to-read-csv-file-and-assign-to-eigen-matrix
+template<typename M> M HenningImpedanceController::load_csv (const std::string & path) {
+    std::ifstream indata;
+    indata.open(path);
+    std::string line;
+    std::vector<double> values;
+    uint rows = 0;
+    while (std::getline(indata, line)) {
+        std::stringstream lineStream(line);
+        std::string cell;
+        while (std::getline(lineStream, cell, ',')) {
+            values.push_back(std::stod(cell));
+        }
+        ++rows;
+    }
+    return Eigen::Map<const Eigen::Matrix<typename M::Scalar, M::RowsAtCompileTime, M::ColsAtCompileTime, Eigen::RowMajor>>(values.data(), rows, values.size()/rows);
 }
 
 void HenningImpedanceController::equilibriumPoseCallback(
