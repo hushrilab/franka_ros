@@ -50,7 +50,23 @@ class HenningImpedanceController : public controller_interface::MultiInterfaceCo
   
   // for trajectory
   double r {0.1};
-  double omega {1};
+  double omega_ {1};
+  
+  // Load MATLAB trajectory
+  std::string path = "../rospackages/catkin_ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/";
+  
+  Eigen::MatrixXd X = load_csv<Eigen::MatrixXd>(path + "x.csv");
+  Eigen::MatrixXd dX = load_csv<Eigen::MatrixXd>(path + "dx.csv");
+  Eigen::MatrixXd ddX = load_csv<Eigen::MatrixXd>(path + "ddx.csv");
+  
+  Eigen::MatrixXd Quats = load_csv<Eigen::MatrixXd>(path + "quats.csv");
+  Eigen::MatrixXd omega = load_csv<Eigen::MatrixXd>(path + "omega.csv");
+  Eigen::MatrixXd domega = load_csv<Eigen::MatrixXd>(path + "domega.csv");
+  
+  Eigen::MatrixXd ts = load_csv<Eigen::MatrixXd>("../Documents/Panda_Traj_Exports/ts.csv");
+  
+  double counter = 0;
+  double i = 0;
   
   const double delta_tau_max_{1.0};   
   

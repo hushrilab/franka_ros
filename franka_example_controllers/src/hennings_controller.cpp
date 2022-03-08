@@ -210,67 +210,63 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 //  //desired position and velocity
 
 //  // Point to Point movements
-
-  position_d_target << 0.0, 0, 0.7;
-  
-  angles_d <<  0  * M_PI/180 + M_PI,  // x-axis (roll) (points forward)
-               0  * M_PI/180,         // y-axis (pitch) (points to the right)
-               0  * M_PI/180;         // z-axis (yaw) compared to base frame in intial position (points downwards)
-
-  orientation_d_target =    Eigen::AngleAxisd(angles_d(0), Eigen::Vector3d::UnitX())
-                          * Eigen::AngleAxisd(angles_d(1), Eigen::Vector3d::UnitY())
-                          * Eigen::AngleAxisd(angles_d(2), Eigen::Vector3d::UnitZ()); 
-                          
-  omega_d_global.setZero();
-  domega_d_global.setZero();
-  
-  // Trajectory planning 
-  
-  // Point to Point
-  
-  double T = 10;
-  
-  double a3 = 10 / pow(T, 3);
-  double a4 = - 15 / pow(T, 4);
-  double a5 = 6 / pow(T, 5);
-  
-  double s = a3 * pow(time.toSec(), 3) + a4 * pow(time.toSec(), 4) + a5 * pow(time.toSec(), 5);
-  double ds = 3 * a3 * pow(time.toSec(), 2) + 4 * a4 * pow(time.toSec(), 3) + 5 * a5 * pow(time.toSec(), 4);
-  double dds = 6 * a3 * time.toSec() + 12 * a4 * pow(time.toSec(), 2) + 20 * a5 * pow(time.toSec(), 3);
-  
-  if (s <= 1) {
-    position_d << position_init + s * (position_d_target - position_init);
-    velocity_d << ds * (position_d_target - position_init);
-    acceleration_d << dds * (position_d_target - position_init);
-  }
-  
-  else {
-    position_d << position_d_target;
-    velocity_d.setZero();
-    acceleration_d.setZero();
-  }
-  
-  // Load matrices
-  Eigen::MatrixXd X = load_csv<Eigen::MatrixXd>("/home/airlab/Documents/Panda_Traj_Exports/x.csv");
-  Eigen::MatrixXd dX = load_csv<Eigen::MatrixXd>("/home/airlab/Documents/Panda_Traj_Exports/dx.csv");
-  Eigen::MatrixXd ddX = load_csv<Eigen::MatrixXd>("/home/airlab/Documents/Panda_Traj_Exports/ddx.csv");
-
-  if (flag) { 
-    std::cout<<X<<std::endl;
-  }
-  // Damp the motion between the points
-
-  double motion_damp = 0.001;                     
-  
-  orientation_d = orientation_d.slerp(motion_damp, orientation_d_target);
+// 
+//   position_d_target << 0.0, 0, 0.7;
+//   
+//   angles_d <<  0  * M_PI/180 + M_PI,  // x-axis (roll) (points forward)
+//                0  * M_PI/180,         // y-axis (pitch) (points to the right)
+//                0  * M_PI/180;         // z-axis (yaw) compared to base frame in intial position (points downwards)
+// 
+//   orientation_d_target =    Eigen::AngleAxisd(angles_d(0), Eigen::Vector3d::UnitX())
+//                           * Eigen::AngleAxisd(angles_d(1), Eigen::Vector3d::UnitY())
+//                           * Eigen::AngleAxisd(angles_d(2), Eigen::Vector3d::UnitZ()); 
+//                           
+//   omega_d_global.setZero();
+//   domega_d_global.setZero();
+//   
+//   double T = 10;
+//   
+//   double a3 = 10 / pow(T, 3);
+//   double a4 = - 15 / pow(T, 4);
+//   double a5 = 6 / pow(T, 5);
+//   
+//   double s = a3 * pow(time.toSec(), 3) + a4 * pow(time.toSec(), 4) + a5 * pow(time.toSec(), 5);
+//   double ds = 3 * a3 * pow(time.toSec(), 2) + 4 * a4 * pow(time.toSec(), 3) + 5 * a5 * pow(time.toSec(), 4);
+//   double dds = 6 * a3 * time.toSec() + 12 * a4 * pow(time.toSec(), 2) + 20 * a5 * pow(time.toSec(), 3);
+//   
+//   if (s <= 1) {
+//     position_d << position_init + s * (position_d_target - position_init);
+//     velocity_d << ds * (position_d_target - position_init);
+//     acceleration_d << dds * (position_d_target - position_init);
+//   }
+//   
+//   else {
+//     position_d << position_d_target;
+//     velocity_d.setZero();
+//     acceleration_d.setZero();
+//   }
+// 
+// 
+//   // Linear Interpolation for Orientation
+// 
+//   double motion_damp = 0.001;                     
+//   
+//   orientation_d = orientation_d.slerp(motion_damp, orientation_d_target);
                            
-// Circular Motion
+ 
+// // Trajectory Planning with MATLAB
+    
+  position_d << X(i,0), X(i,1), X(i,2);  //X.row(i) does not work
+  velocity_d << dX(i,0), dX(i,1), dX(i,2);
+  acceleration_d << ddX(i,0), ddX(i,1), ddX(i,2);
   
-//   position_d <<  r * cos(omega * time.toSec()) + position_init(0) - r,
-//                  r * sin(omega * time.toSec()) + position_init(1), 
-//                  position_init(2);
-//             
-//                             
+  orientation_d.coeffs() << Quats(i,1), Quats(i,2), Quats(i,3), Quats(i,0);
+  omega_d_global << omega(i,0), omega(i,1), omega(i,2);
+  domega_d_global << domega(i,0), domega(i,1), domega(i,2);
+  
+  if (time.toSec() >= i * ts(0,0) + 3 && time.toSec() >= ts(0,0) + 3 && i < X.rows() - 1) {
+    i++;
+  } 
   
   Eigen::VectorXd ddx(6);
   ddx.setZero();
@@ -360,17 +356,17 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 
 // Compare all values
 
-  for (size_t i = 0; i < 7; ++i) {
-    if (std::abs(tau_d[i]) > tau_max[i]) {
-        std::cout << "Error: Torque at joint: "<< i <<" is too big!! ("<< tau_d[i] <<" Nm)"<<std::endl;
-    }
-    if (std::abs(ddq_filtered[i]) > ddq_max[i]) {
-        std::cout << "Error: ddq at joint: "<< i <<" is too big!! ("<< ddq_filtered[i] <<" m/s^2)"<<std::endl;
-    }
-    if (std::abs(dq[i]) > dq_max[i]) {
-        std::cout << "Error: dq at joint: "<< i <<" is too big!! ("<< dq[i] <<" m/s^2)"<<std::endl;
-    }
-  }
+//   for (size_t i = 0; i < 7; ++i) {
+//     if (std::abs(tau_d[i]) > tau_max[i]) {
+//         std::cout << "Error: Torque at joint: "<< i <<" is too big!! ("<< tau_d[i] <<" Nm)"<<std::endl;
+//     }
+//     if (std::abs(ddq_filtered[i]) > ddq_max[i]) {
+//         std::cout << "Error: ddq at joint: "<< i <<" is too big!! ("<< ddq_filtered[i] <<" m/s^2)"<<std::endl;
+//     }
+//     if (std::abs(dq[i]) > dq_max[i]) {
+//         std::cout << "Error: dq at joint: "<< i <<" is too big!! ("<< dq[i] <<" m/s^2)"<<std::endl;
+//     }
+//   }
 
   // Update values
   
