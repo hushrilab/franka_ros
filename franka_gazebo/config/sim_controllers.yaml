@@ -62,6 +62,18 @@ Cartesian_Impedance_P2P:
     - $(arg arm_id)_joint5
     - $(arg arm_id)_joint6
     - $(arg arm_id)_joint7
+    
+Cartesian_Impedance_Traj:
+  type: franka_example_controllers/CartesianImpedanceTrajectory
+  arm_id: $(arg arm_id)
+  joint_names:
+    - $(arg arm_id)_joint1
+    - $(arg arm_id)_joint2
+    - $(arg arm_id)_joint3
+    - $(arg arm_id)_joint4
+    - $(arg arm_id)_joint5
+    - $(arg arm_id)_joint6
+    - $(arg arm_id)_joint7
 
 effort_joint_trajectory_controller:
   type: effort_controllers/JointTrajectoryController

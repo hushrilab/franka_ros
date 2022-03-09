@@ -64,4 +64,9 @@
           Cartesian Impedance Point to Point Controller written by Henning
       </description>
   </class>
+  <class name="franka_example_controllers/CartesianImpedanceTrajectory" type="franka_example_controllers::CartesianImpedanceTrajectory" base_class_type="controller_interface::ControllerBase">
+      <description>
+          Cartesian Impedance Controller written by Henning that follows Trajectory provided by CSV file
+      </description>
+  </class>
 </library>

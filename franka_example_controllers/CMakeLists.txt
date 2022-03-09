@@ -73,6 +73,7 @@ add_library(franka_example_controllers
   src/teleop_joint_pd_example_controller.cpp
   src/hennings_controller.cpp
   src/Cartesian_Impedance_P2P.cpp
+  src/Cartesian_Impedance_Traj.cpp
 )
 
 add_dependencies(franka_example_controllers

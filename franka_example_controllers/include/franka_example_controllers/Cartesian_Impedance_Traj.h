@@ -1,5 +1,4 @@
-// Copyright (c) 2017 Franka Emika GmbH
-// Use of this source code is governed by the Apache-2.0 license, see LICENSE
+
 #pragma once
 
 #include <memory>
@@ -22,7 +21,7 @@
 
 namespace franka_example_controllers {
 
-class CartesianImpedanceP2P : public controller_interface::MultiInterfaceController<
+class CartesianImpedanceTrajectory : public controller_interface::MultiInterfaceController<
                                                 franka_hw::FrankaModelInterface,
                                                 hardware_interface::EffortJointInterface,
                                                 franka_hw::FrankaStateInterface> {
@@ -39,11 +38,35 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   
   // Filter
   void Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input,  const Eigen::MatrixXd& input_prev, Eigen::MatrixXd& y);
+  
+  template<typename M> M load_csv (const std::string & path);
 
   std::unique_ptr<franka_hw::FrankaStateHandle> state_handle_;
   std::unique_ptr<franka_hw::FrankaModelHandle> model_handle_;
   std::vector<hardware_interface::JointHandle> joint_handles_;
   
+  // Load MATLAB trajectory
+  std::string path = "../rospackages/catkin_ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/";
+  
+  Eigen::MatrixXd X = load_csv<Eigen::MatrixXd>(path + "x.csv");
+  Eigen::MatrixXd dX = load_csv<Eigen::MatrixXd>(path + "dx.csv");
+  Eigen::MatrixXd ddX = load_csv<Eigen::MatrixXd>(path + "ddx.csv");
+  Eigen::MatrixXd Quats = load_csv<Eigen::MatrixXd>(path + "quats.csv");
+  Eigen::MatrixXd omega = load_csv<Eigen::MatrixXd>(path + "omega.csv");
+  Eigen::MatrixXd domega = load_csv<Eigen::MatrixXd>(path + "domega.csv");
+  Eigen::MatrixXd ts = load_csv<Eigen::MatrixXd>("../Documents/Panda_Traj_Exports/ts.csv");
+  
+  double counter = 0;
+  double i = 0;
+  
+  // for quintic trajectory
+  double T;
+  double a3;
+  double a4;
+  double a5;
+  double s; 
+  double ds;
+  double dds;
   // Errors
   Eigen::Matrix<double, 6, 1> error;
   Eigen::Matrix<double, 6, 1> derror;
@@ -77,14 +100,7 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   Eigen::Matrix<double, 7, 1> tau_max;
   Eigen::Matrix<double, 7, 1> tau_min;
   
-  // for quintic trajectory
-  double T;
-  double a3;
-  double a4;
-  double a5;
-  double s; 
-  double ds;
-  double dds;
+
   
   Eigen::Vector3d    curr_position;
   Eigen::Matrix<double, 6, 1>    curr_velocity;

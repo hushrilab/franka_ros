@@ -1,33 +1,29 @@
 // Copyright (c) 2017 Franka Emika GmbH
 // Use of this source code is governed by the Apache-2.0 license, see LICENSE
-#include <franka_example_controllers/Cartesian_Impedance_P2P.h>
+#include <franka_example_controllers/Cartesian_Impedance_Traj.h>
 
 #include <cmath>
 #include <memory>
-
+#include <fstream>
 #include <controller_interface/controller_base.h>
 #include <franka/robot_state.h>
 #include <pluginlib/class_list_macros.h>
 #include <ros/ros.h>
 
+
 namespace franka_example_controllers {
 
-bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
+bool CartesianImpedanceTrajectory::init(hardware_interface::RobotHW* robot_hw,
                                                ros::NodeHandle& node_handle) {
-
-//     sub_equilibrium_pose_ = node_handle.subscribe(
-//         "equilibrium_pose", 20, &CartesianImpedanceP2P::equilibriumPoseCallback, this,
-//         ros::TransportHints().reliable().tcpNoDelay());
-
     std::string arm_id;
     if (!node_handle.getParam("arm_id", arm_id)) {
-        ROS_ERROR_STREAM("CartesianImpedanceP2P: Could not read parameter arm_id");
+        ROS_ERROR_STREAM("CartesianImpedanceTrajectory: Could not read parameter arm_id");
         return false;
     }
     std::vector<std::string> joint_names;
     if (!node_handle.getParam("joint_names", joint_names) || joint_names.size() != 7) {
         ROS_ERROR(
-            "CartesianImpedanceP2P: Invalid or no joint_names parameters provided, "
+            "CartesianImpedanceTrajectory: Invalid or no joint_names parameters provided, "
             "aborting controller init!");
         return false;
     }
@@ -35,7 +31,7 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     auto* model_interface = robot_hw->get<franka_hw::FrankaModelInterface>();
     if (model_interface == nullptr) {
         ROS_ERROR_STREAM(
-            "CartesianImpedanceP2P: Error getting model interface from hardware");
+            "CartesianImpedanceTrajectory: Error getting model interface from hardware");
         return false;
     }
     try {
@@ -43,7 +39,7 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
             model_interface->getHandle(arm_id + "_model"));
     } catch (hardware_interface::HardwareInterfaceException& ex) {
         ROS_ERROR_STREAM(
-            "CartesianImpedanceP2P: Exception getting model handle from interface: "
+            "CartesianImpedanceTrajectory: Exception getting model handle from interface: "
             << ex.what());
         return false;
     }
@@ -51,7 +47,7 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     auto* state_interface = robot_hw->get<franka_hw::FrankaStateInterface>();
     if (state_interface == nullptr) {
         ROS_ERROR_STREAM(
-            "CartesianImpedanceP2P: Error getting state interface from hardware");
+            "CartesianImpedanceTrajectory: Error getting state interface from hardware");
         return false;
     }
     try {
@@ -59,7 +55,7 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
             state_interface->getHandle(arm_id + "_robot"));
     } catch (hardware_interface::HardwareInterfaceException& ex) {
         ROS_ERROR_STREAM(
-            "CartesianImpedanceP2P: Exception getting state handle from interface: "
+            "CartesianImpedanceTrajectory: Exception getting state handle from interface: "
             << ex.what());
         return false;
     }
@@ -67,7 +63,7 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     auto* effort_joint_interface = robot_hw->get<hardware_interface::EffortJointInterface>();
     if (effort_joint_interface == nullptr) {
         ROS_ERROR_STREAM(
-            "CartesianImpedanceP2P: Error getting effort joint interface from hardware");
+            "CartesianImpedanceTrajectory: Error getting effort joint interface from hardware");
         return false;
     }
     for (size_t i = 0; i < 7; ++i) {
@@ -75,7 +71,7 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
         joint_handles_.push_back(effort_joint_interface->getHandle(joint_names[i]));
         } catch (const hardware_interface::HardwareInterfaceException& ex) {
         ROS_ERROR_STREAM(
-            "CartesianImpedanceP2P: Exception getting joint handles: " << ex.what());
+            "CartesianImpedanceTrajectory: Exception getting joint handles: " << ex.what());
         return false;
         }
     }
@@ -107,15 +103,10 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     D_N << D_N * 0.5 * sqrt(K_N(0,0));  
     I.setIdentity();
     
-    // To check max values
-    dq_max << 2.175, 2.175, 2.175, 2.175, 2.61, 2.61, 2.61;
-    tau_max << 87, 87, 87, 87, 12, 12, 12;
-    tau_min << -tau_max;
-    
     notFirstRun = false;
     
     // define time of quintic trajectory
-    T   =   10;
+    T   =   3;
     a3  =   10 / pow(T, 3);
     a4  = - 15 / pow(T, 4);
     a5  =    6 / pow(T, 5);
@@ -127,7 +118,7 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     return true;
 }
 
-void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
+void CartesianImpedanceTrajectory::starting(const ros::Time& /*time*/) {
 
     franka::RobotState initial_state = state_handle_->getRobotState();
 
@@ -152,7 +143,7 @@ void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
     q_nullspace          <<  q_initial;
 }
 
-void CartesianImpedanceP2P::update(const ros::Time& time, const ros::Duration& period) {
+void CartesianImpedanceTrajectory::update(const ros::Time& time, const ros::Duration& period) {
     
     // get state variables
     franka::RobotState robot_state = state_handle_->getRobotState();
@@ -184,39 +175,44 @@ void CartesianImpedanceP2P::update(const ros::Time& time, const ros::Duration& p
     Filter(0.005, djacobian.rows(), djacobian.cols(), djacobian, djacobian_filtered, y);
     djacobian_filtered << y;
 
-//////////////////////////////////////////////   POINT to POINT MOVEMENT  /////////////////////////////////////////
-    
-    position_d_target << 0.3, 0, 0.8; 
-//     position_d_target << position_init;
-    
-    angles_d_target   <<   0, 90,  0;  // x-axis (roll, points forward)// y-axis (pitch, points to the right)// z-axis (yaw, points downwards)
-                            
-    orientation_d_target =    Eigen::AngleAxisd(angles_d_target(0) * M_PI/180 + M_PI, Eigen::Vector3d::UnitX())
-                            * Eigen::AngleAxisd(angles_d_target(1) * M_PI/180       , Eigen::Vector3d::UnitY())
-                            * Eigen::AngleAxisd(angles_d_target(2) * M_PI/180       , Eigen::Vector3d::UnitZ()); 
-                            
+
+///////////////////////////////////////////////   FOLLOW TRAJECTORY  /////////////////////////////////////////
+ 
+    position_d_target << X(0,0),   X(0,1),   X(0,2);
+
+    orientation_d_target.coeffs() << Quats(0,1),  Quats(0,2),  Quats(0,3), Quats(0,0);
+                          
     omega_d_global.setZero();
-    domega_d_global.setZero();
-    
+    domega_d_global.setZero();   
+                            
     if (s <= 1) {
         s =       a3 * pow(time.toSec(), 3) +      a4 * pow(time.toSec(), 4) +      a5 * pow(time.toSec(), 5);
         ds =  3 * a3 * pow(time.toSec(), 2) +  4 * a4 * pow(time.toSec(), 3) +  5 * a5 * pow(time.toSec(), 4);
         dds = 6 * a3 *         time.toSec() + 12 * a4 * pow(time.toSec(), 2) + 20 * a5 * pow(time.toSec(), 3); 
         
-        //  // Point to Point movements
+        // Slowly move to start of Trajectory
         position_d     << position_init + s * (position_d_target - position_init);
         velocity_d     << ds * (position_d_target - position_init);
         acceleration_d << dds * (position_d_target - position_init);  
         orientation_d  =  orientation_d.slerp(10/T * s/1000, orientation_d_target);
     }
     else {
-        position_d  << position_d_target;
-        velocity_d.setZero();
-        acceleration_d.setZero();
-        orientation_d = orientation_d.slerp(0.002, orientation_d_target);
+        // FOLLOW TRAJECTORY FROM MATLAB
+            
+        position_d     <<   X(i,0),   X(i,1),   X(i,2);  //X.row(i) does not work
+        velocity_d     <<  dX(i,0),  dX(i,1),  dX(i,2);
+        acceleration_d << ddX(i,0), ddX(i,1), ddX(i,2);
+        
+        orientation_d.coeffs() <<  Quats(i,1),  Quats(i,2),  Quats(i,3), Quats(i,0);
+        omega_d_global         <<  omega(i,0),  omega(i,1),  omega(i,2);
+        domega_d_global        << domega(i,0), domega(i,1), domega(i,2);
+    
+        if (time.toSec() >= i * ts(0,0) + T && time.toSec() >= ts(0,0) + T && i < X.rows() - 1) {
+            i++;
+        } 
     }
     
-///////////////////////////////////// COMPUTE ERRORS //////////////////////////////////////////////////////
+/////////////////////////////////////////// COMPUTE ERRORS ///////////////////////////////////////////////////
     
     // POSITION ERROR
     error.head(3)  << curr_position - position_d;
@@ -254,7 +250,6 @@ void CartesianImpedanceP2P::update(const ros::Time& time, const ros::Duration& p
     } 
     
     F_tau << Lambda * ddx - K_d * derror - K_p * error - C_hat * derror - Lambda * djacobian_filtered * dq;
-            
 //     F_tau <<   -(K_d * derror + K_p * error);
     
     tau_task << jacobian.transpose() * F_tau;
@@ -266,7 +261,7 @@ void CartesianImpedanceP2P::update(const ros::Time& time, const ros::Duration& p
 //     Desired torque
     tau_d << tau_task + coriolis + tau_nullspace;
 
-    q_nullspace << q;
+//     q_nullspace << q;
     
 /////////////////////////////////////////// end of controller ///////////////////////////////////////////////  
     
@@ -276,9 +271,6 @@ void CartesianImpedanceP2P::update(const ros::Time& time, const ros::Duration& p
         joint_handles_[i].setCommand(tau_d(i));
     }
     
-//     std::lock_guard<std::mutex> position_d_target_mutex_lock(
-//         position_and_orientation_d_target_mutex_);
-    
 //     std::cout << "Error" <<std::endl<< error * 1000 <<std::endl; 
 
     // UPDATE VALUES FOR FINITE DIFFERENCES
@@ -287,7 +279,7 @@ void CartesianImpedanceP2P::update(const ros::Time& time, const ros::Duration& p
     notFirstRun = true;
 }
 
-Eigen::Matrix<double, 7, 1> CartesianImpedanceP2P::saturateTorqueRate(const Eigen::Matrix<double, 7, 1>& tau_d_calculated,
+Eigen::Matrix<double, 7, 1> CartesianImpedanceTrajectory::saturateTorqueRate(const Eigen::Matrix<double, 7, 1>& tau_d_calculated,
     const Eigen::Matrix<double, 7, 1>& tau_J_d) {
     
     Eigen::Matrix<double, 7, 1> tau_d_saturated{};
@@ -298,27 +290,32 @@ Eigen::Matrix<double, 7, 1> CartesianImpedanceP2P::saturateTorqueRate(const Eige
     return tau_d_saturated;
 }
   
-void CartesianImpedanceP2P::Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input, 
+void CartesianImpedanceTrajectory::Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input, 
     const Eigen::MatrixXd& y_prev,   Eigen::MatrixXd& y) {
         
     y.resize(rows,cols);
     y << (1 - filter_param) * y_prev + filter_param * input;
 }
 
-// void CartesianImpedanceP2P::equilibriumPoseCallback(
-//     const geometry_msgs::PoseStampedConstPtr& msg) {
-//     std::lock_guard<std::mutex> position_d_target_mutex_lock(
-//         position_and_orientation_d_target_mutex_);
-//     position_d_target << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
-//     Eigen::Quaterniond last_orientation_d_target(orientation_d_target);
-//     orientation_d_target.coeffs() << msg->pose.orientation.x, msg->pose.orientation.y,
-//         msg->pose.orientation.z, msg->pose.orientation.w;
-//     if (last_orientation_d_target.coeffs().dot(orientation_d_target.coeffs()) < 0.0) {
-//     orientation_d_target.coeffs() << -orientation_d_target.coeffs();
-//     }
-// }
+// Function to lad csv files; Source: https://stackoverflow.com/questions/34247057/how-to-read-csv-file-and-assign-to-eigen-matrix
+template<typename M> M CartesianImpedanceTrajectory::load_csv (const std::string & path) {
+    std::ifstream indata;
+    indata.open(path);
+    std::string line;
+    std::vector<double> values;
+    uint rows = 0;
+    while (std::getline(indata, line)) {
+        std::stringstream lineStream(line);
+        std::string cell;
+        while (std::getline(lineStream, cell, ',')) {
+            values.push_back(std::stod(cell));
+        }
+        ++rows;
+    }
+    return Eigen::Map<const Eigen::Matrix<typename M::Scalar, M::RowsAtCompileTime, M::ColsAtCompileTime, Eigen::RowMajor>>(values.data(), rows, values.size()/rows);
+}
 
 }  // namespace franka_example_controllers
 
-PLUGINLIB_EXPORT_CLASS(franka_example_controllers::CartesianImpedanceP2P,
+PLUGINLIB_EXPORT_CLASS(franka_example_controllers::CartesianImpedanceTrajectory,
                        controller_interface::ControllerBase)
