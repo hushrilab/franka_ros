@@ -104,6 +104,18 @@ hennings_controller:
         - panda_joint5
         - panda_joint6
         - panda_joint7
+        
+Cartesian_Impedance_P2P:
+    type: franka_example_controllers/CartesianImpedanceP2P
+    arm_id: panda
+    joint_names:
+        - panda_joint1
+        - panda_joint2
+        - panda_joint3
+        - panda_joint4
+        - panda_joint5
+        - panda_joint6
+        - panda_joint7
 
 dual_arm_cartesian_impedance_example_controller:
     type: franka_example_controllers/DualArmCartesianImpedanceExampleController

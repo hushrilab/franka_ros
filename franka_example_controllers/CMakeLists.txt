@@ -72,6 +72,7 @@ add_library(franka_example_controllers
   src/dual_arm_cartesian_impedance_example_controller.cpp
   src/teleop_joint_pd_example_controller.cpp
   src/hennings_controller.cpp
+  src/Cartesian_Impedance_P2P.cpp
 )
 
 add_dependencies(franka_example_controllers
