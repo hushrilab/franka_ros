@@ -101,11 +101,6 @@ bool HenningImpedanceController::init(hardware_interface::RobotHW* robot_hw,
   K_p.diagonal() << 600, 600, 600, 30, 30, 10;
   K_d.diagonal() << 30, 30, 30, 1.5, 1.5, 1.5;
   
-// for controller with F_ext
-//   M_d.diagonal() << 0.2, 0.2, 0.2, 0.2, 0.2, 0.2;
-//   K_p.diagonal() << 50, 50, 50, 100, 100, 100;
-//   K_d.diagonal() << 25, 25, 25, 30, 30, 30;  
-  
 // For the easiest controller  
 //   K_p.diagonal() << 500, 500, 400, 18, 18, 8;
 //   K_d.diagonal() << 30, 30, 30, 0.3, 0.3, 0.3;
@@ -190,7 +185,8 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
         djacobian << (jacobian - jacobian_prev) / period.toSec();
         ddq << (dq - dq_prev) / period.toSec();
   }
-  // Filter signals
+  
+  // FILTER SIGNALS
   Eigen::MatrixXd y(7,7);
   
   Filter(0.001, ddq.rows(), ddq.cols(), ddq, ddq_prev, ddq_filtered, y);
@@ -207,83 +203,67 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   Eigen::VectorXd curr_velocity(6);
   curr_velocity << jacobian * dq;
   
-//  //desired position and velocity
-
-//  // Point to Point movements
-// 
-//   position_d_target << 0.0, 0, 0.7;
-//   
-//   angles_d <<  0  * M_PI/180 + M_PI,  // x-axis (roll) (points forward)
-//                0  * M_PI/180,         // y-axis (pitch) (points to the right)
-//                0  * M_PI/180;         // z-axis (yaw) compared to base frame in intial position (points downwards)
-// 
-//   orientation_d_target =    Eigen::AngleAxisd(angles_d(0), Eigen::Vector3d::UnitX())
-//                           * Eigen::AngleAxisd(angles_d(1), Eigen::Vector3d::UnitY())
-//                           * Eigen::AngleAxisd(angles_d(2), Eigen::Vector3d::UnitZ()); 
-//                           
-//   omega_d_global.setZero();
-//   domega_d_global.setZero();
-//   
-//   double T = 10;
-//   
-//   double a3 = 10 / pow(T, 3);
-//   double a4 = - 15 / pow(T, 4);
-//   double a5 = 6 / pow(T, 5);
-//   
-//   double s = a3 * pow(time.toSec(), 3) + a4 * pow(time.toSec(), 4) + a5 * pow(time.toSec(), 5);
-//   double ds = 3 * a3 * pow(time.toSec(), 2) + 4 * a4 * pow(time.toSec(), 3) + 5 * a5 * pow(time.toSec(), 4);
-//   double dds = 6 * a3 * time.toSec() + 12 * a4 * pow(time.toSec(), 2) + 20 * a5 * pow(time.toSec(), 3);
-//   
-//   if (s <= 1) {
-//     position_d << position_init + s * (position_d_target - position_init);
-//     velocity_d << ds * (position_d_target - position_init);
-//     acceleration_d << dds * (position_d_target - position_init);
-//   }
-//   
-//   else {
-//     position_d << position_d_target;
-//     velocity_d.setZero();
-//     acceleration_d.setZero();
-//   }
-// 
-// 
-//   // Linear Interpolation for Orientation
-// 
-//   double motion_damp = 0.001;                     
-//   
-//   orientation_d = orientation_d.slerp(motion_damp, orientation_d_target);
-                           
+ ///////////////////////////////////////////////   FOLLOW TRAJECTORY  /////////////////////////////////////////
  
-// // Trajectory Planning with MATLAB
+  position_d_target << X(0,0),   X(0,1),   X(0,2);
+
+  orientation_d_target.coeffs() << Quats(0,1),  Quats(0,2),  Quats(0,3), Quats(0,0);
+                          
+  omega_d_global.setZero();
+  domega_d_global.setZero();
+  
+  double T = 5;
+  
+  double a3 =   10 / pow(T, 3);
+  double a4 = - 15 / pow(T, 4);
+  double a5 =    6 / pow(T, 5);
+  
+  double s =       a3 * pow(time.toSec(), 3) +      a4 * pow(time.toSec(), 4) +      a5 * pow(time.toSec(), 5);
+  double ds =  3 * a3 * pow(time.toSec(), 2) +  4 * a4 * pow(time.toSec(), 3) +  5 * a5 * pow(time.toSec(), 4);
+  double dds = 6 * a3 *         time.toSec() + 12 * a4 * pow(time.toSec(), 2) + 20 * a5 * pow(time.toSec(), 3);
+  
+  if (s <= 1) {
+      
+    // Slowly move to start of Trajectory
+    position_d << position_init + s * (position_d_target - position_init);
+    velocity_d << ds * (position_d_target - position_init);
+    acceleration_d << dds * (position_d_target - position_init); 
     
-  position_d << X(i,0), X(i,1), X(i,2);  //X.row(i) does not work
-  velocity_d << dX(i,0), dX(i,1), dX(i,2);
-  acceleration_d << ddX(i,0), ddX(i,1), ddX(i,2);
+    // Linear Interpolation for Orientation
+    double motion_damp = 0.001;                     
+    orientation_d = orientation_d.slerp(motion_damp, orientation_d_target);
+  }
   
-  orientation_d.coeffs() << Quats(i,1), Quats(i,2), Quats(i,3), Quats(i,0);
-  omega_d_global << omega(i,0), omega(i,1), omega(i,2);
-  domega_d_global << domega(i,0), domega(i,1), domega(i,2);
+  else {
+    // FOLLOW TRAJECTORY FROM MATLAB
+        
+    position_d     <<   X(i,0),   X(i,1),   X(i,2);  //X.row(i) does not work
+    velocity_d     <<  dX(i,0),  dX(i,1),  dX(i,2);
+    acceleration_d << ddX(i,0), ddX(i,1), ddX(i,2);
+    
+    orientation_d.coeffs() <<  Quats(i,1),  Quats(i,2),  Quats(i,3), Quats(i,0);
+    omega_d_global         <<  omega(i,0),  omega(i,1),  omega(i,2);
+    domega_d_global        << domega(i,0), domega(i,1), domega(i,2);
+    
+    // three seconds delay at the beginning
+    if (time.toSec() >= i * ts(0,0) + T && time.toSec() >= ts(0,0) + T && i < X.rows() - 1) {
+        i++;
+    } 
+  }
   
-  if (time.toSec() >= i * ts(0,0) + 3 && time.toSec() >= ts(0,0) + 3 && i < X.rows() - 1) {
-    i++;
-  } 
+
   
-  Eigen::VectorXd ddx(6);
-  ddx.setZero();
-  ddx.head(3) << acceleration_d; 
-  ddx.tail(3) << domega_d_global;    
+  ///////////////////////////////////// COMPUTE ERRORS //////////////////////////////////////////////////////
   
-  // compute errors to desired pose
-  
-  // Position Error
+  // POSITION ERROR
   error.head(3) << curr_position - position_d;
   
-  // Orientation error 
+  // ORIENTATION ERROR
   if (orientation_d.coeffs().dot(curr_orientation.coeffs()) < 0.0) {
     curr_orientation.coeffs() << -curr_orientation.coeffs(); // take short way around the circle and by using positve dot product of quaternions
   }
   
-   // orientation Error (According to Silciano)
+   // (According to Silciano)
   
   Eigen::Vector3d quat_d, quat_c;
   
@@ -297,21 +277,23 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
             
   error.tail(3) << -( curr_orientation.w() * quat_d - orientation_d.w() * quat_c - quat_d.cross(quat_c));  
   
-  // Velocity Error
+  // VELOCITY ERROR
   derror << curr_velocity;
   derror.head(3) << derror.head(3) - velocity_d;
   derror.tail(3) << derror.tail(3) - omega_d_global;
+
+  // ACCELERATION VECTOR
+  Eigen::VectorXd ddx(6);
+  ddx.setZero();
+  ddx.head(3) << acceleration_d; 
+  ddx.tail(3) << domega_d_global;    
   
-  // Compute Control
-  // Allocate variables
-  Eigen::VectorXd tau_task(7), tau_nullspace(7), tau_d(7);
+  ///////////////////////////////////// CONTROLLER //////////////////////////////////////////////////////
   
-   
 ///////////////////  Paper: Cartesian Impedance Control of Redundant Robots:       /////////////////////////
 //////////////////          Recent Results with the DLR-Light-Weight-Arms, DLR    /////////////////////////
   
-// Comment: Works good but cannot find the optimal nullspace joint angles
-  
+  Eigen::VectorXd tau_task(7), tau_nullspace(7), tau_d(7);
 
   Lambda << (jacobian * mass_inv * jacobian.transpose()).inverse();
   
@@ -323,8 +305,6 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   } 
   
   F_tau <<    Lambda * ddx - K_d * derror - K_p * error - C_hat * derror - Lambda * djacobian_filtered * dq;
-  
-//   F_tau <<    Lambda.inverse() * ddx - Lambda.inverse() * M_d.inverse() * (K_d * derror + K_p * error) - Lambda * djacobian_filtered * dq;
            
 //    F_tau <<   -(K_d * derror + K_p * error);
    
@@ -339,7 +319,7 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
   // Desired torque
   tau_d << tau_task + coriolis + N * tau_nullspace;
   
-  q_nullspace << q;
+//   q_nullspace << q;
  
 /////////////////////////////////////////// end of controller ///////////////////////////////////////////////  
   
@@ -368,7 +348,7 @@ void HenningImpedanceController::update(const ros::Time& time, const ros::Durati
 //     }
 //   }
 
-  // Update values
+  // UPDATE VALUES FOR FINITE DIFFERENCES
   
   jacobian_prev << jacobian;
   djacobian_prev << djacobian;
