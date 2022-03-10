@@ -54,7 +54,7 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   Eigen::MatrixXd Quats = load_csv<Eigen::MatrixXd>(path + "quats.csv");
   Eigen::MatrixXd omega = load_csv<Eigen::MatrixXd>(path + "omega.csv");
   Eigen::MatrixXd domega = load_csv<Eigen::MatrixXd>(path + "domega.csv");
-  Eigen::MatrixXd ts = load_csv<Eigen::MatrixXd>("../Documents/Panda_Traj_Exports/ts.csv");
+  Eigen::MatrixXd ts = load_csv<Eigen::MatrixXd>(path + "ts.csv");
   
   double counter = 0;
   double i = 0;
