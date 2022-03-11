@@ -216,6 +216,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         velocity_d.setZero();
         acceleration_d.setZero();
         orientation_d = orientation_d.slerp(0.008, orientation_d_target);
+        
     }
     
 ///////////////////////////////////// COMPUTE ERRORS //////////////////////////////////////////////////////
