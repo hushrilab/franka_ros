@@ -132,7 +132,7 @@ void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
     franka::RobotState initial_state = state_handle_->getRobotState();
 
     Eigen::Map<Eigen::Matrix<double, 7, 1>> q_initial(initial_state.q.data());
-    TransformationMatrix= Eigen::Matrix4d::Map(initial_state.O_T_EE.data());
+    TransformationMatrix_init = Eigen::Matrix4d::Map(initial_state.O_T_EE.data());
     
     std::array<double, 42> jacobian_array = model_handle_->getZeroJacobian(franka::Frame::kEndEffector);
         
@@ -143,8 +143,8 @@ void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
     Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(initial_state.dq.data());
 
     // set equilibrium point to current state
-    position_init        =   TransformationMatrix.translation();
-    orientation_init     =   TransformationMatrix.rotation();
+    position_init        =   TransformationMatrix_init.translation();
+    orientation_init     =   TransformationMatrix_init.rotation();
     position_d           <<  position_init; 
     orientation_d        =   orientation_init;
     position_d_target    <<  position_init; 

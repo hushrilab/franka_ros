@@ -54,6 +54,7 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
 
   bool notFirstRun;
   Eigen::Affine3d TransformationMatrix;
+  Eigen::Affine3d TransformationMatrix_init;
   Eigen::Matrix<double, 7, 7> mass_inv;
   Eigen::Matrix<double, 6, 6> Lambda;
   Eigen::Matrix<double, 6, 6> Lambda_prev;
