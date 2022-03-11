@@ -110,7 +110,7 @@ bool CartesianImpedanceTrajectory::init(hardware_interface::RobotHW* robot_hw,
     s   =    0;
     ds  =    0;
     dds =    0;
-    
+    sleep(5);
     return true;
 }
 

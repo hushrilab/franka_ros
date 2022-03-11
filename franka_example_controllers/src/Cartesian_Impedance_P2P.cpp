@@ -92,7 +92,7 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     
     //   For Impedance Controller
     K_p.diagonal() << 700, 700, 700, 40, 40, 15;
-    K_d.diagonal() << 40, 40, 40, 0.8, 0.8, 0.4;
+    K_d.diagonal() << 40, 40, 40, 0.7, 0.7, 0.4;
     
 //     For the easiest controller  
 //     K_p.diagonal() << 500, 500, 400, 18, 18, 8;
@@ -110,7 +110,7 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     notFirstRun = false;
     
     // define time of quintic trajectory
-    T   =   10;
+    T   =   5;
     a3  =   10 / pow(T, 3);
     a4  = - 15 / pow(T, 4);
     a5  =    6 / pow(T, 5);
@@ -118,6 +118,8 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     s   =    0;
     ds  =    0;
     dds =    0;
+
+ sleep(4);
     
     return true;
 }
@@ -145,6 +147,8 @@ void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
     position_d_target    <<  position_init; 
     orientation_d_target =   orientation_init;
     q_nullspace          <<  q_initial;
+
+
 }
 
 void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duration& period) {
@@ -183,10 +187,10 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
 
 //////////////////////////////////////////////   POINT to POINT MOVEMENT  /////////////////////////////////////////
     
-    position_d_target << 0.3, 0, 0.6; 
+    position_d_target << 0.3, 0, 0.8; 
  //   position_d_target << position_init;
     
-    angles_d_target   <<   0, 0,  0;  // x-axis (roll, points forward)// y-axis (pitch, points to the right)// z-axis (yaw, points downwards)
+    angles_d_target   <<   0, 60,  0;  // x-axis (roll, points forward)// y-axis (pitch, points to the right)// z-axis (yaw, points downwards)
                             
     orientation_d_target =    Eigen::AngleAxisd(angles_d_target(0) * M_PI/180 +   M_PI, Eigen::Vector3d::UnitX())
                             * Eigen::AngleAxisd(angles_d_target(1) * M_PI/180         , Eigen::Vector3d::UnitY())
@@ -315,6 +319,7 @@ void CartesianImpedanceP2P::Filter(double filter_param, int rows, int cols, cons
 //     orientation_d_target.coeffs() << -orientation_d_target.coeffs();
 //     }
 // }
+
 
 }  // namespace franka_example_controllers
 
