@@ -81,10 +81,10 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     }
 
     // Variable Initialization
-    position_d                    << 0.5,   0, 0.5;
-    orientation_d.coeffs()        << 0.0, 1.0, 0.0, 0.0;
-    position_d_target             << 0.5,   0, 0.5;
-    orientation_d_target.coeffs() << 0.0, 1.0, 0.0, 0.0;  
+    position_d.setZero();
+    orientation_d.coeffs()        << 0.0, 0.0, 0.0, 1.0;
+    position_d_target.setZero();
+    orientation_d_target.coeffs() << 0.0, 0.0, 0.0, 1.0;  
     
     error.setZero();
     derror.setZero();
@@ -152,10 +152,17 @@ void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
     q_nullspace          <<  q_initial;
 }
 
+<<<<<<< HEAD
+void CartesianImpedanceP2P::update(const ros::Time& time, const ros::Duration& period) {
+
+    counter = counter + period.toSec();
+
+=======
 void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duration& period) {
     
     mytime = mytime + period.toSec();
     
+>>>>>>> b5b77357f236322d6258b52e8c4e8cae0a9145e1
     // get state variables
     franka::RobotState robot_state = state_handle->getRobotState();
     std::array<double, 7>  coriolis_array = model_handle->getCoriolis();
@@ -189,7 +196,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
 //////////////////////////////////////////////   POINT to POINT MOVEMENT  /////////////////////////////////////////
     
     position_d_target << 0.3, 0, 0.8; 
-//     position_d_target << position_init;
+ //   position_d_target << position_init;
     
     angles_d_target   <<   0, 60,  0;  // x-axis (roll, points forward)// y-axis (pitch, points to the right)// z-axis (yaw, points downwards)
                             
@@ -201,9 +208,15 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     domega_d_global.setZero();
     
     if (s <= 1) {
+<<<<<<< HEAD
+        s =       a3 * pow(counter, 3) +      a4 * pow(counter, 4) +      a5 * pow(counter, 5);
+        ds =  3 * a3 * pow(counter, 2) +  4 * a4 * pow(counter, 3) +  5 * a5 * pow(counter, 4);
+        dds = 6 * a3 *         counter + 12 * a4 * pow(counter, 2) + 20 * a5 * pow(counter, 3); 
+=======
         s =       a3 * pow(mytime, 3) +      a4 * pow(mytime, 4) +      a5 * pow(mytime, 5);
         ds =  3 * a3 * pow(mytime, 2) +  4 * a4 * pow(mytime, 3) +  5 * a5 * pow(mytime, 4);
         dds = 6 * a3 *         mytime + 12 * a4 * pow(mytime, 2) + 20 * a5 * pow(mytime, 3); 
+>>>>>>> b5b77357f236322d6258b52e8c4e8cae0a9145e1
         
         //  // Point to Point movements
         position_d     << position_init + s * (position_d_target - position_init);

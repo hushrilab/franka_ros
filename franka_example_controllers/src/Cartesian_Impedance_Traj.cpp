@@ -139,9 +139,15 @@ void CartesianImpedanceTrajectory::starting(const ros::Time& /*time*/) {
     q_nullspace          <<  q_initial;
 }
 
+<<<<<<< HEAD
+void CartesianImpedanceTrajectory::update(const ros::Time& time, const ros::Duration& period) {
+
+    counter = counter + period.toSec();
+=======
 void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::Duration& period) {
     
     mytime = mytime + period.toSec();
+>>>>>>> b5b77357f236322d6258b52e8c4e8cae0a9145e1
     
     // get state variables
     franka::RobotState robot_state = state_handle->getRobotState();
@@ -183,9 +189,15 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
     domega_d_global.setZero();   
                             
     if (s <= 1) {
+<<<<<<< HEAD
+        s =       a3 * pow(counter, 3) +      a4 * pow(counter, 4) +      a5 * pow(counter, 5);
+        ds =  3 * a3 * pow(counter, 2) +  4 * a4 * pow(counter, 3) +  5 * a5 * pow(counter, 4);
+        dds = 6 * a3 *         counter + 12 * a4 * pow(counter, 2) + 20 * a5 * pow(counter, 3); 
+=======
         s =       a3 * pow(mytime, 3) +      a4 * pow(mytime, 4) +      a5 * pow(mytime, 5);
         ds =  3 * a3 * pow(mytime, 2) +  4 * a4 * pow(mytime, 3) +  5 * a5 * pow(mytime, 4);
         dds = 6 * a3 *         mytime + 12 * a4 * pow(mytime, 2) + 20 * a5 * pow(mytime, 3); 
+>>>>>>> b5b77357f236322d6258b52e8c4e8cae0a9145e1
         
         // Slowly move to start of Trajectory
         position_d     <<  position_init + s * (position_d_target - position_init);
@@ -203,7 +215,11 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
         omega_d_global         <<  omega(i,0),  omega(i,1),  omega(i,2);
         domega_d_global        << domega(i,0), domega(i,1), domega(i,2);
     
+<<<<<<< HEAD
+        if (counter >= i * ts(0,0) + T && counter >= ts(0,0) + T && i < X.rows() - 1) {
+=======
         if (mytime >= i * ts(0,0) + T && mytime >= ts(0,0) + T && i < X.rows() - 1) {
+>>>>>>> b5b77357f236322d6258b52e8c4e8cae0a9145e1
             i++;
         } 
     }
