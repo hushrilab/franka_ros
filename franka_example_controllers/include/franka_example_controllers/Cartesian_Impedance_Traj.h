@@ -5,6 +5,7 @@
 #include <mutex>
 #include <string>
 #include <vector>
+#include <fstream>
 
 #include <controller_interface/multi_interface_controller.h>
 #include <dynamic_reconfigure/server.h>
@@ -39,26 +40,43 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   // Filter
   void Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input,  const Eigen::MatrixXd& input_prev, Eigen::MatrixXd& y);
   
-  template<typename M> M load_csv (const std::string & path);
-
-  std::unique_ptr<franka_hw::FrankaStateHandle> state_handle_;
-  std::unique_ptr<franka_hw::FrankaModelHandle> model_handle_;
-  std::vector<hardware_interface::JointHandle> joint_handles_;
+//   template<typename M> M load_csv (const std::string & path, const std::string & filename);
+  //  Function to lad csv files; Source: https://stackoverflow.com/questions/34247057/how-to-read-csv-file-and-assign-to-eigen-matrix
+  template<typename M> M load_csv (const std::string & path, const std::string & filename) {
+    std::ifstream indata;
+    indata.open(path + filename);
+    std::string line;
+    std::vector<double> values;
+    uint rows = 0;
+    while (std::getline(indata, line)) {
+        std::stringstream lineStream(line);
+        std::string cell;
+        while (std::getline(lineStream, cell, ',')) {
+            values.push_back(std::stod(cell));
+        }
+        ++rows;
+    }
+    return Eigen::Map<const Eigen::Matrix<typename M::Scalar, M::RowsAtCompileTime, M::ColsAtCompileTime, Eigen::RowMajor>>(values.data(), rows, values.size()/rows);
+  }
+  
+  std::unique_ptr<franka_hw::FrankaStateHandle> state_handle;
+  std::unique_ptr<franka_hw::FrankaModelHandle> model_handle;
+  std::vector<hardware_interface::JointHandle>  joint_handle;
   
   // Load MATLAB trajectory
   std::string path = "../rospackages/catkin_ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/";
   
-  Eigen::MatrixXd X = load_csv<Eigen::MatrixXd>(path + "x.csv");
-  Eigen::MatrixXd dX = load_csv<Eigen::MatrixXd>(path + "dx.csv");
-  Eigen::MatrixXd ddX = load_csv<Eigen::MatrixXd>(path + "ddx.csv");
-  Eigen::MatrixXd Quats = load_csv<Eigen::MatrixXd>(path + "quats.csv");
-  Eigen::MatrixXd omega = load_csv<Eigen::MatrixXd>(path + "omega.csv");
-  Eigen::MatrixXd domega = load_csv<Eigen::MatrixXd>(path + "domega.csv");
-  Eigen::MatrixXd ts = load_csv<Eigen::MatrixXd>(path + "ts.csv");
+  Eigen::MatrixXd X      = load_csv<Eigen::MatrixXd>(path,      "x.csv");
+  Eigen::MatrixXd dX     = load_csv<Eigen::MatrixXd>(path,     "dx.csv");
+  Eigen::MatrixXd ddX    = load_csv<Eigen::MatrixXd>(path,    "ddx.csv");
+  Eigen::MatrixXd Quats  = load_csv<Eigen::MatrixXd>(path,  "quats.csv");
+  Eigen::MatrixXd omega  = load_csv<Eigen::MatrixXd>(path,  "omega.csv");
+  Eigen::MatrixXd domega = load_csv<Eigen::MatrixXd>(path, "domega.csv");
+  Eigen::MatrixXd ts     = load_csv<Eigen::MatrixXd>(path,     "ts.csv");
   
-  double counter = 0;
   double i = 0;
   
+  std::vector<double> k_gains;
   // for quintic trajectory
   double T;
   double a3;
@@ -67,6 +85,7 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   double s; 
   double ds;
   double dds;
+  
   // Errors
   Eigen::Matrix<double, 6, 1> error;
   Eigen::Matrix<double, 6, 1> derror;
@@ -100,10 +119,9 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   Eigen::Matrix<double, 7, 1> tau_max;
   Eigen::Matrix<double, 7, 1> tau_min;
   
-
-  
   Eigen::Vector3d    curr_position;
-  Eigen::Matrix<double, 6, 1>    curr_velocity;
+  Eigen::Matrix<double, 6, 1> curr_velocity;
+  Eigen::Matrix<double, 6, 1> ddx;
   Eigen::Quaterniond curr_orientation;
   Eigen::Vector3d    position_d;
   Eigen::Vector3d    position_d_target;
@@ -118,12 +136,8 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   Eigen::Vector3d    omega_d_global;
   Eigen::Vector3d    domega_d_local;
   Eigen::Vector3d    domega_d_global;
-//   std::mutex position_and_orientation_d_target_mutex_;
-  
+
   const double delta_tau_max_{1.0};   
-//   // Equilibrium pose subscriber
-//   ros::Subscriber sub_equilibrium_pose_;
-//   void equilibriumPoseCallback(const geometry_msgs::PoseStampedConstPtr& msg);
 };
 
 }  // namespace franka_example_controllers
