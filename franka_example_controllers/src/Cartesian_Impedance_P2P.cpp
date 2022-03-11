@@ -152,17 +152,10 @@ void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
     q_nullspace          <<  q_initial;
 }
 
-<<<<<<< HEAD
-void CartesianImpedanceP2P::update(const ros::Time& time, const ros::Duration& period) {
-
-    counter = counter + period.toSec();
-
-=======
 void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duration& period) {
     
     mytime = mytime + period.toSec();
     
->>>>>>> b5b77357f236322d6258b52e8c4e8cae0a9145e1
     // get state variables
     franka::RobotState robot_state = state_handle->getRobotState();
     std::array<double, 7>  coriolis_array = model_handle->getCoriolis();
