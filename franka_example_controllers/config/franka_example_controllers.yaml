@@ -128,6 +128,21 @@ Cartesian_Impedance_Traj:
         - panda_joint5
         - panda_joint6
         - panda_joint7
+    k_gains:
+        - 600.0
+        - 600.0
+        - 600.0
+        - 30.0
+        - 30.0
+        - 10.0
+    d_gains:
+        - 50.0
+        - 50.0
+        - 50.0
+        - 20.0
+        - 20.0
+        - 20.0
+        - 10.0
 
 dual_arm_cartesian_impedance_example_controller:
     type: franka_example_controllers/DualArmCartesianImpedanceExampleController
