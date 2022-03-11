@@ -84,8 +84,8 @@ bool CartesianImpedanceTrajectory::init(hardware_interface::RobotHW* robot_hw,
     
     //   For Impedance Controller
 //     K_p.diagonal() << k_gains[0], k_gains[1], k_gains[2], k_gains[3], k_gains[4], k_gains[5];
-    K_p.diagonal() << 600, 600, 600, 30, 30, 10;
-    K_d.diagonal() << 30, 30, 30, 1.5, 1.5, 1.5;
+    K_p.diagonal() << 700, 700, 700, 40, 40, 15;
+    K_d.diagonal() << 40, 40, 40, 0.8, 0.8, 0.8;
     
 //     For the easiest controller  
 //     K_p.diagonal() << 500, 500, 400, 18, 18, 8;

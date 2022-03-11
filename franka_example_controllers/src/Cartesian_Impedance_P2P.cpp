@@ -91,8 +91,8 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     dderror.setZero();
     
     //   For Impedance Controller
-    K_p.diagonal() << 600, 600, 600, 30, 30, 10;
-    K_d.diagonal() << 30, 30, 30, 1.5, 1.5, 1.5;
+    K_p.diagonal() << 700, 700, 700, 40, 40, 15;
+    K_d.diagonal() << 40, 40, 40, 0.8, 0.8, 0.4;
     
 //     For the easiest controller  
 //     K_p.diagonal() << 500, 500, 400, 18, 18, 8;
@@ -103,14 +103,9 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     // Nullspace stiffness and damping
     K_N.setIdentity();
     D_N.setIdentity();
-    K_N << K_N * 15;
-    D_N << D_N * 0.5 * sqrt(K_N(0,0));  
+    K_N << K_N * 25;
+    D_N << D_N * 0.7;  
     I.setIdentity();
-    
-    // To check max values
-    dq_max << 2.175, 2.175, 2.175, 2.175, 2.61, 2.61, 2.61;
-    tau_max << 87, 87, 87, 87, 12, 12, 12;
-    tau_min << -tau_max;
     
     notFirstRun = false;
     
@@ -188,14 +183,14 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
 
 //////////////////////////////////////////////   POINT to POINT MOVEMENT  /////////////////////////////////////////
     
-    position_d_target << 0.3, 0, 0.8; 
+    position_d_target << 0.3, 0, 0.6; 
  //   position_d_target << position_init;
     
-    angles_d_target   <<   0, 60,  0;  // x-axis (roll, points forward)// y-axis (pitch, points to the right)// z-axis (yaw, points downwards)
+    angles_d_target   <<   0, 0,  0;  // x-axis (roll, points forward)// y-axis (pitch, points to the right)// z-axis (yaw, points downwards)
                             
-    orientation_d_target =    Eigen::AngleAxisd(angles_d_target(0) * M_PI/180 + M_PI, Eigen::Vector3d::UnitX())
-                            * Eigen::AngleAxisd(angles_d_target(1) * M_PI/180       , Eigen::Vector3d::UnitY())
-                            * Eigen::AngleAxisd(angles_d_target(2) * M_PI/180       , Eigen::Vector3d::UnitZ()); 
+    orientation_d_target =    Eigen::AngleAxisd(angles_d_target(0) * M_PI/180 +   M_PI, Eigen::Vector3d::UnitX())
+                            * Eigen::AngleAxisd(angles_d_target(1) * M_PI/180         , Eigen::Vector3d::UnitY())
+                            * Eigen::AngleAxisd(angles_d_target(2) * M_PI/180 + M_PI/4, Eigen::Vector3d::UnitZ()); 
                             
     omega_d_global.setZero();
     domega_d_global.setZero();
@@ -215,7 +210,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         position_d  << position_d_target;
         velocity_d.setZero();
         acceleration_d.setZero();
-        orientation_d = orientation_d.slerp(0.008, orientation_d_target);
+        orientation_d = orientation_d.slerp(0.01, orientation_d_target);
         
     }
     
