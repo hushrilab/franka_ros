@@ -81,10 +81,10 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     }
 
     // Variable Initialization
-    position_d                    << 0.5,   0, 0.5;
-    orientation_d.coeffs()        << 0.0, 1.0, 0.0, 0.0;
-    position_d_target             << 0.5,   0, 0.5;
-    orientation_d_target.coeffs() << 0.0, 1.0, 0.0, 0.0;  
+    position_d.setZero();
+    orientation_d.coeffs()        << 0.0, 0.0, 0.0, 1.0;
+    position_d_target.setZero();
+    orientation_d_target.coeffs() << 0.0, 0.0, 0.0, 1.0;  
     
     error.setZero();
     derror.setZero();
@@ -153,7 +153,9 @@ void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
 }
 
 void CartesianImpedanceP2P::update(const ros::Time& time, const ros::Duration& period) {
-    
+
+    counter = counter + period.toSec();
+
     // get state variables
     franka::RobotState robot_state = state_handle_->getRobotState();
     std::array<double, 7>  coriolis_array = model_handle_->getCoriolis();
@@ -187,9 +189,9 @@ void CartesianImpedanceP2P::update(const ros::Time& time, const ros::Duration& p
 //////////////////////////////////////////////   POINT to POINT MOVEMENT  /////////////////////////////////////////
     
     position_d_target << 0.3, 0, 0.8; 
-//     position_d_target << position_init;
+ //   position_d_target << position_init;
     
-    angles_d_target   <<   0, 90,  0;  // x-axis (roll, points forward)// y-axis (pitch, points to the right)// z-axis (yaw, points downwards)
+    angles_d_target   <<   0, 60,  0;  // x-axis (roll, points forward)// y-axis (pitch, points to the right)// z-axis (yaw, points downwards)
                             
     orientation_d_target =    Eigen::AngleAxisd(angles_d_target(0) * M_PI/180 + M_PI, Eigen::Vector3d::UnitX())
                             * Eigen::AngleAxisd(angles_d_target(1) * M_PI/180       , Eigen::Vector3d::UnitY())
@@ -199,9 +201,9 @@ void CartesianImpedanceP2P::update(const ros::Time& time, const ros::Duration& p
     domega_d_global.setZero();
     
     if (s <= 1) {
-        s =       a3 * pow(time.toSec(), 3) +      a4 * pow(time.toSec(), 4) +      a5 * pow(time.toSec(), 5);
-        ds =  3 * a3 * pow(time.toSec(), 2) +  4 * a4 * pow(time.toSec(), 3) +  5 * a5 * pow(time.toSec(), 4);
-        dds = 6 * a3 *         time.toSec() + 12 * a4 * pow(time.toSec(), 2) + 20 * a5 * pow(time.toSec(), 3); 
+        s =       a3 * pow(counter, 3) +      a4 * pow(counter, 4) +      a5 * pow(counter, 5);
+        ds =  3 * a3 * pow(counter, 2) +  4 * a4 * pow(counter, 3) +  5 * a5 * pow(counter, 4);
+        dds = 6 * a3 *         counter + 12 * a4 * pow(counter, 2) + 20 * a5 * pow(counter, 3); 
         
         //  // Point to Point movements
         position_d     << position_init + s * (position_d_target - position_init);

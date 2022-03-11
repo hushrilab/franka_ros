@@ -43,6 +43,8 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   std::unique_ptr<franka_hw::FrankaStateHandle> state_handle_;
   std::unique_ptr<franka_hw::FrankaModelHandle> model_handle_;
   std::vector<hardware_interface::JointHandle> joint_handles_;
+
+double counter = 0;
   
   // Errors
   Eigen::Matrix<double, 6, 1> error;
