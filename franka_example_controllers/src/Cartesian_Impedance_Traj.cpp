@@ -119,7 +119,7 @@ void CartesianImpedanceTrajectory::starting(const ros::Time& /*time*/) {
     franka::RobotState initial_state = state_handle->getRobotState();
 
     Eigen::Map<Eigen::Matrix<double, 7, 1>> q_initial(initial_state.q.data());
-    TransformationMatrix= Eigen::Matrix4d::Map(initial_state.O_T_EE.data());
+    TransformationMatrix = Eigen::Matrix4d::Map(initial_state.O_T_EE.data());
     
     std::array<double, 42> jacobian_array = model_handle->getZeroJacobian(franka::Frame::kEndEffector);
         
@@ -139,7 +139,9 @@ void CartesianImpedanceTrajectory::starting(const ros::Time& /*time*/) {
     q_nullspace          <<  q_initial;
 }
 
-void CartesianImpedanceTrajectory::update(const ros::Time& time, const ros::Duration& period) {
+void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::Duration& period) {
+    
+    mytime = mytime + period.toSec();
     
     // get state variables
     franka::RobotState robot_state = state_handle->getRobotState();
@@ -181,9 +183,9 @@ void CartesianImpedanceTrajectory::update(const ros::Time& time, const ros::Dura
     domega_d_global.setZero();   
                             
     if (s <= 1) {
-        s =       a3 * pow(time.toSec(), 3) +      a4 * pow(time.toSec(), 4) +      a5 * pow(time.toSec(), 5);
-        ds =  3 * a3 * pow(time.toSec(), 2) +  4 * a4 * pow(time.toSec(), 3) +  5 * a5 * pow(time.toSec(), 4);
-        dds = 6 * a3 *         time.toSec() + 12 * a4 * pow(time.toSec(), 2) + 20 * a5 * pow(time.toSec(), 3); 
+        s =       a3 * pow(mytime, 3) +      a4 * pow(mytime, 4) +      a5 * pow(mytime, 5);
+        ds =  3 * a3 * pow(mytime, 2) +  4 * a4 * pow(mytime, 3) +  5 * a5 * pow(mytime, 4);
+        dds = 6 * a3 *         mytime + 12 * a4 * pow(mytime, 2) + 20 * a5 * pow(mytime, 3); 
         
         // Slowly move to start of Trajectory
         position_d     <<  position_init + s * (position_d_target - position_init);
@@ -201,7 +203,7 @@ void CartesianImpedanceTrajectory::update(const ros::Time& time, const ros::Dura
         omega_d_global         <<  omega(i,0),  omega(i,1),  omega(i,2);
         domega_d_global        << domega(i,0), domega(i,1), domega(i,2);
     
-        if (time.toSec() >= i * ts(0,0) + T && time.toSec() >= ts(0,0) + T && i < X.rows() - 1) {
+        if (mytime >= i * ts(0,0) + T && mytime >= ts(0,0) + T && i < X.rows() - 1) {
             i++;
         } 
     }

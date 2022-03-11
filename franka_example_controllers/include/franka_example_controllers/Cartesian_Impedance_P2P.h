@@ -40,9 +40,11 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   // Filter
   void Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input,  const Eigen::MatrixXd& input_prev, Eigen::MatrixXd& y);
 
-  std::unique_ptr<franka_hw::FrankaStateHandle> state_handle_;
-  std::unique_ptr<franka_hw::FrankaModelHandle> model_handle_;
-  std::vector<hardware_interface::JointHandle> joint_handles_;
+  std::unique_ptr<franka_hw::FrankaStateHandle> state_handle;
+  std::unique_ptr<franka_hw::FrankaModelHandle> model_handle;
+  std::vector<hardware_interface::JointHandle>  joint_handle;
+  
+  double mytime = 0;
   
   // Errors
   Eigen::Matrix<double, 6, 1> error;
@@ -54,7 +56,6 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
 
   bool notFirstRun;
   Eigen::Affine3d TransformationMatrix;
-  Eigen::Affine3d TransformationMatrix_init;
   Eigen::Matrix<double, 7, 7> mass_inv;
   Eigen::Matrix<double, 6, 6> Lambda;
   Eigen::Matrix<double, 6, 6> Lambda_prev;
