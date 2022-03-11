@@ -208,15 +208,9 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     domega_d_global.setZero();
     
     if (s <= 1) {
-<<<<<<< HEAD
-        s =       a3 * pow(counter, 3) +      a4 * pow(counter, 4) +      a5 * pow(counter, 5);
-        ds =  3 * a3 * pow(counter, 2) +  4 * a4 * pow(counter, 3) +  5 * a5 * pow(counter, 4);
-        dds = 6 * a3 *         counter + 12 * a4 * pow(counter, 2) + 20 * a5 * pow(counter, 3); 
-=======
         s =       a3 * pow(mytime, 3) +      a4 * pow(mytime, 4) +      a5 * pow(mytime, 5);
         ds =  3 * a3 * pow(mytime, 2) +  4 * a4 * pow(mytime, 3) +  5 * a5 * pow(mytime, 4);
         dds = 6 * a3 *         mytime + 12 * a4 * pow(mytime, 2) + 20 * a5 * pow(mytime, 3); 
->>>>>>> b5b77357f236322d6258b52e8c4e8cae0a9145e1
         
         //  // Point to Point movements
         position_d     << position_init + s * (position_d_target - position_init);
