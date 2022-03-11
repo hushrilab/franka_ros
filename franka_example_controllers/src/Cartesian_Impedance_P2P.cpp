@@ -39,7 +39,7 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
         return false;
     }
     try {
-        model_handle_ = std::make_unique<franka_hw::FrankaModelHandle>(
+        model_handle = std::make_unique<franka_hw::FrankaModelHandle>(
             model_interface->getHandle(arm_id + "_model"));
     } catch (hardware_interface::HardwareInterfaceException& ex) {
         ROS_ERROR_STREAM(
@@ -55,7 +55,7 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
         return false;
     }
     try {
-        state_handle_ = std::make_unique<franka_hw::FrankaStateHandle>(
+        state_handle = std::make_unique<franka_hw::FrankaStateHandle>(
             state_interface->getHandle(arm_id + "_robot"));
     } catch (hardware_interface::HardwareInterfaceException& ex) {
         ROS_ERROR_STREAM(
@@ -72,7 +72,7 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     }
     for (size_t i = 0; i < 7; ++i) {
         try {
-        joint_handles_.push_back(effort_joint_interface->getHandle(joint_names[i]));
+        joint_handle.push_back(effort_joint_interface->getHandle(joint_names[i]));
         } catch (const hardware_interface::HardwareInterfaceException& ex) {
         ROS_ERROR_STREAM(
             "CartesianImpedanceP2P: Exception getting joint handles: " << ex.what());
@@ -129,12 +129,12 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
 
 void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
 
-    franka::RobotState initial_state = state_handle_->getRobotState();
+    franka::RobotState initial_state = state_handle->getRobotState();
 
     Eigen::Map<Eigen::Matrix<double, 7, 1>> q_initial(initial_state.q.data());
-    TransformationMatrix_init = Eigen::Matrix4d::Map(initial_state.O_T_EE.data());
+    TransformationMatrix = Eigen::Matrix4d::Map(initial_state.O_T_EE.data());
     
-    std::array<double, 42> jacobian_array = model_handle_->getZeroJacobian(franka::Frame::kEndEffector);
+    std::array<double, 42> jacobian_array = model_handle->getZeroJacobian(franka::Frame::kEndEffector);
         
     Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
     jacobian_prev << jacobian;
@@ -143,8 +143,8 @@ void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
     Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(initial_state.dq.data());
 
     // set equilibrium point to current state
-    position_init        =   TransformationMatrix_init.translation();
-    orientation_init     =   TransformationMatrix_init.rotation();
+    position_init        =   TransformationMatrix.translation();
+    orientation_init     =   TransformationMatrix.rotation();
     position_d           <<  position_init; 
     orientation_d        =   orientation_init;
     position_d_target    <<  position_init; 
@@ -152,15 +152,22 @@ void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
     q_nullspace          <<  q_initial;
 }
 
+<<<<<<< HEAD
 void CartesianImpedanceP2P::update(const ros::Time& time, const ros::Duration& period) {
 
     counter = counter + period.toSec();
 
+=======
+void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duration& period) {
+    
+    mytime = mytime + period.toSec();
+    
+>>>>>>> b5b77357f236322d6258b52e8c4e8cae0a9145e1
     // get state variables
-    franka::RobotState robot_state = state_handle_->getRobotState();
-    std::array<double, 7>  coriolis_array = model_handle_->getCoriolis();
-    std::array<double, 42> jacobian_array = model_handle_->getZeroJacobian(franka::Frame::kEndEffector);
-    std::array<double, 49> mass_array = model_handle_->getMass();
+    franka::RobotState robot_state = state_handle->getRobotState();
+    std::array<double, 7>  coriolis_array = model_handle->getCoriolis();
+    std::array<double, 42> jacobian_array = model_handle->getZeroJacobian(franka::Frame::kEndEffector);
+    std::array<double, 49> mass_array = model_handle->getMass();
     
     // convert to Eigen
     Eigen::Map<Eigen::Matrix<double, 7, 7>> mass(mass_array.data());
@@ -201,9 +208,15 @@ void CartesianImpedanceP2P::update(const ros::Time& time, const ros::Duration& p
     domega_d_global.setZero();
     
     if (s <= 1) {
+<<<<<<< HEAD
         s =       a3 * pow(counter, 3) +      a4 * pow(counter, 4) +      a5 * pow(counter, 5);
         ds =  3 * a3 * pow(counter, 2) +  4 * a4 * pow(counter, 3) +  5 * a5 * pow(counter, 4);
         dds = 6 * a3 *         counter + 12 * a4 * pow(counter, 2) + 20 * a5 * pow(counter, 3); 
+=======
+        s =       a3 * pow(mytime, 3) +      a4 * pow(mytime, 4) +      a5 * pow(mytime, 5);
+        ds =  3 * a3 * pow(mytime, 2) +  4 * a4 * pow(mytime, 3) +  5 * a5 * pow(mytime, 4);
+        dds = 6 * a3 *         mytime + 12 * a4 * pow(mytime, 2) + 20 * a5 * pow(mytime, 3); 
+>>>>>>> b5b77357f236322d6258b52e8c4e8cae0a9145e1
         
         //  // Point to Point movements
         position_d     << position_init + s * (position_d_target - position_init);
@@ -215,7 +228,7 @@ void CartesianImpedanceP2P::update(const ros::Time& time, const ros::Duration& p
         position_d  << position_d_target;
         velocity_d.setZero();
         acceleration_d.setZero();
-        orientation_d = orientation_d.slerp(0.002, orientation_d_target);
+        orientation_d = orientation_d.slerp(0.008, orientation_d_target);
     }
     
 ///////////////////////////////////// COMPUTE ERRORS //////////////////////////////////////////////////////
@@ -275,7 +288,7 @@ void CartesianImpedanceP2P::update(const ros::Time& time, const ros::Duration& p
     // Saturate torque rate to avoid discontinuities
     tau_d << saturateTorqueRate(tau_d, tau_J_d);
     for (size_t i = 0; i < 7; ++i) {
-        joint_handles_[i].setCommand(tau_d(i));
+        joint_handle[i].setCommand(tau_d(i));
     }
     
 //     std::lock_guard<std::mutex> position_d_target_mutex_lock(
