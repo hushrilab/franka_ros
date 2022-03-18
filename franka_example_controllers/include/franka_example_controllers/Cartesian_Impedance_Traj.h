@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <cmath>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -40,7 +41,6 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   // Filter
   void Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input,  const Eigen::MatrixXd& input_prev, Eigen::MatrixXd& y);
   
-//   template<typename M> M load_csv (const std::string & path, const std::string & filename);
   //  Function to lad csv files; Source: https://stackoverflow.com/questions/34247057/how-to-read-csv-file-and-assign-to-eigen-matrix
   template<typename M> M load_csv (const std::string & path, const std::string & filename) {
     std::ifstream indata;
@@ -65,8 +65,8 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   
   // Load MATLAB trajectory
 
-  // std::string path = "../rospackages/catkin_ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/";
-   std::string path = "../ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/";
+   std::string path = "../rospackages/catkin_ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/";
+//    std::string path = "../ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/";
 
   
   Eigen::MatrixXd X      = load_csv<Eigen::MatrixXd>(path,      "x.csv");
@@ -120,9 +120,7 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   Eigen::Matrix<double, 6, 7> djacobian;
   Eigen::Matrix<double, 6, 7> djacobian_filtered;
   Eigen::Matrix<double, 6, 7> jacobian_prev;
-  Eigen::Matrix<double, 7, 1> dq_max;
-  Eigen::Matrix<double, 7, 1> tau_max;
-  Eigen::Matrix<double, 7, 1> tau_min;
+  Eigen::Matrix<double, 7, 1> tau_d_saturated;
   
   Eigen::Vector3d    curr_position;
   Eigen::Matrix<double, 6, 1> curr_velocity;

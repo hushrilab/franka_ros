@@ -1,9 +1,5 @@
-// Copyright (c) 2017 Franka Emika GmbH
-// Use of this source code is governed by the Apache-2.0 license, see LICENSE
-#include <franka_example_controllers/Cartesian_Impedance_P2P.h>
 
-#include <cmath>
-#include <memory>
+#include <franka_example_controllers/Cartesian_Impedance_P2P.h>
 
 #include <controller_interface/controller_base.h>
 #include <franka/robot_state.h>
@@ -14,10 +10,6 @@ namespace franka_example_controllers {
 
 bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
                                                ros::NodeHandle& node_handle) {
-
-//     sub_equilibrium_pose_ = node_handle.subscribe(
-//         "equilibrium_pose", 20, &CartesianImpedanceP2P::equilibriumPoseCallback, this,
-//         ros::TransportHints().reliable().tcpNoDelay());
 
     std::string arm_id;
     if (!node_handle.getParam("arm_id", arm_id)) {
@@ -81,11 +73,11 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     }
 
     // Variable Initialization
-    position_d.setZero();
-    orientation_d.coeffs()        << 0.0, 0.0, 0.0, 1.0;
-    position_d_target.setZero();
-    orientation_d_target.coeffs() << 0.0, 0.0, 0.0, 1.0;  
-    
+    position_d                    << 0.5,   0, 0.5;
+    orientation_d.coeffs()        << 0.0, 1.0, 0.0, 0.0;
+    position_d_target             << 0.5,   0, 0.5;
+    orientation_d_target.coeffs() << 0.0, 1.0, 0.0, 0.0;   
+    ddx.setZero();
     error.setZero();
     derror.setZero();
     dderror.setZero();
@@ -114,12 +106,9 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     a3  =   10 / pow(T, 3);
     a4  = - 15 / pow(T, 4);
     a5  =    6 / pow(T, 5);
-    
     s   =    0;
     ds  =    0;
     dds =    0;
-
- sleep(4);
     
     return true;
 }
@@ -147,8 +136,6 @@ void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
     position_d_target    <<  position_init; 
     orientation_d_target =   orientation_init;
     q_nullspace          <<  q_initial;
-
-
 }
 
 void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duration& period) {
@@ -215,7 +202,6 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         velocity_d.setZero();
         acceleration_d.setZero();
         orientation_d = orientation_d.slerp(0.01, orientation_d_target);
-        
     }
     
 ///////////////////////////////////// COMPUTE ERRORS //////////////////////////////////////////////////////
@@ -239,8 +225,6 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     derror.tail(3) << derror.tail(3) - omega_d_global;
 
     // ACCELERATION VECTOR
-    Eigen::VectorXd ddx(6);
-    ddx.setZero();
     ddx.head(3)   << acceleration_d; 
     ddx.tail(3)   << domega_d_global;    
     
@@ -274,12 +258,10 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     
     // Saturate torque rate to avoid discontinuities
     tau_d << saturateTorqueRate(tau_d, tau_J_d);
+    
     for (size_t i = 0; i < 7; ++i) {
         joint_handle[i].setCommand(tau_d(i));
     }
-    
-//     std::lock_guard<std::mutex> position_d_target_mutex_lock(
-//         position_and_orientation_d_target_mutex_);
     
 //     std::cout << "Error" <<std::endl<< error * 1000 <<std::endl; 
 
@@ -292,7 +274,6 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
 Eigen::Matrix<double, 7, 1> CartesianImpedanceP2P::saturateTorqueRate(const Eigen::Matrix<double, 7, 1>& tau_d_calculated,
     const Eigen::Matrix<double, 7, 1>& tau_J_d) {
     
-    Eigen::Matrix<double, 7, 1> tau_d_saturated{};
     for (size_t i = 0; i < 7; i++) {
         double difference = tau_d_calculated[i] - tau_J_d[i];
         tau_d_saturated[i] = tau_J_d[i] + std::max(std::min(difference, delta_tau_max_), -delta_tau_max_);
@@ -306,20 +287,6 @@ void CartesianImpedanceP2P::Filter(double filter_param, int rows, int cols, cons
     y.resize(rows,cols);
     y << (1 - filter_param) * y_prev + filter_param * input;
 }
-
-// void CartesianImpedanceP2P::equilibriumPoseCallback(
-//     const geometry_msgs::PoseStampedConstPtr& msg) {
-//     std::lock_guard<std::mutex> position_d_target_mutex_lock(
-//         position_and_orientation_d_target_mutex_);
-//     position_d_target << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
-//     Eigen::Quaterniond last_orientation_d_target(orientation_d_target);
-//     orientation_d_target.coeffs() << msg->pose.orientation.x, msg->pose.orientation.y,
-//         msg->pose.orientation.z, msg->pose.orientation.w;
-//     if (last_orientation_d_target.coeffs().dot(orientation_d_target.coeffs()) < 0.0) {
-//     orientation_d_target.coeffs() << -orientation_d_target.coeffs();
-//     }
-// }
-
 
 }  // namespace franka_example_controllers
 

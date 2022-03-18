@@ -1,7 +1,7 @@
-// Copyright (c) 2017 Franka Emika GmbH
-// Use of this source code is governed by the Apache-2.0 license, see LICENSE
+
 #pragma once
 
+#include <cmath>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -75,9 +75,7 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   Eigen::Matrix<double, 6, 7> djacobian;
   Eigen::Matrix<double, 6, 7> djacobian_filtered;
   Eigen::Matrix<double, 6, 7> jacobian_prev;
-  Eigen::Matrix<double, 7, 1> dq_max;
-  Eigen::Matrix<double, 7, 1> tau_max;
-  Eigen::Matrix<double, 7, 1> tau_min;
+  Eigen::Matrix<double, 7, 1> tau_d_saturated;
   
   // for quintic trajectory
   double T;
@@ -89,7 +87,8 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   double dds;
   
   Eigen::Vector3d    curr_position;
-  Eigen::Matrix<double, 6, 1>    curr_velocity;
+  Eigen::Matrix<double, 6, 1> curr_velocity;
+  Eigen::Matrix<double, 6, 1> ddx;
   Eigen::Quaterniond curr_orientation;
   Eigen::Vector3d    position_d;
   Eigen::Vector3d    position_d_target;
@@ -104,12 +103,8 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   Eigen::Vector3d    omega_d_global;
   Eigen::Vector3d    domega_d_local;
   Eigen::Vector3d    domega_d_global;
-//   std::mutex position_and_orientation_d_target_mutex_;
   
   const double delta_tau_max_{1.0};   
-//   // Equilibrium pose subscriber
-//   ros::Subscriber sub_equilibrium_pose_;
-//   void equilibriumPoseCallback(const geometry_msgs::PoseStampedConstPtr& msg);
 };
 
 }  // namespace franka_example_controllers

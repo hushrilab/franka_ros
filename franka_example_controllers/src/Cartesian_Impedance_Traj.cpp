@@ -1,15 +1,10 @@
-// Copyright (c) 2017 Franka Emika GmbH
-// Use of this source code is governed by the Apache-2.0 license, see LICENSE
-#include <franka_example_controllers/Cartesian_Impedance_Traj.h>
 
-#include <cmath>
-#include <memory>
+#include <franka_example_controllers/Cartesian_Impedance_Traj.h>
 
 #include <controller_interface/controller_base.h>
 #include <franka/robot_state.h>
 #include <pluginlib/class_list_macros.h>
 #include <ros/ros.h>
-
 
 namespace franka_example_controllers {
 
@@ -26,11 +21,6 @@ bool CartesianImpedanceTrajectory::init(hardware_interface::RobotHW* robot_hw,
             "aborting controller init!");
         return false;
     }
-//     if (!node_handle.getParam("k_gains", k_gains) || k_gains.size() != 6) {
-//     ROS_ERROR("CartesianImpedanceTrajectory:  Invalid or no k_gain parameters provided, aborting "
-//         "controller init!");
-//     return false;
-//     }
 
     auto* model_interface = robot_hw->get<franka_hw::FrankaModelInterface>();
     if (model_interface == nullptr) {
@@ -83,7 +73,6 @@ bool CartesianImpedanceTrajectory::init(hardware_interface::RobotHW* robot_hw,
     dderror.setZero();
     
     //   For Impedance Controller
-//     K_p.diagonal() << k_gains[0], k_gains[1], k_gains[2], k_gains[3], k_gains[4], k_gains[5];
     K_p.diagonal() << 700, 700, 700, 40, 40, 15;
     K_d.diagonal() << 40, 40, 40, 0.8, 0.8, 0.8;
     
@@ -110,7 +99,7 @@ bool CartesianImpedanceTrajectory::init(hardware_interface::RobotHW* robot_hw,
     s   =    0;
     ds  =    0;
     dds =    0;
-    sleep(5);
+
     return true;
 }
 
@@ -143,7 +132,6 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
     
     mytime = mytime + period.toSec();
 
-    
     // get state variables
     franka::RobotState robot_state = state_handle->getRobotState();
     std::array<double, 7>  coriolis_array = model_handle->getCoriolis();
@@ -188,7 +176,6 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
         ds =  3 * a3 * pow(mytime, 2) +  4 * a4 * pow(mytime, 3) +  5 * a5 * pow(mytime, 4);
         dds = 6 * a3 *         mytime + 12 * a4 * pow(mytime, 2) + 20 * a5 * pow(mytime, 3); 
 
-        
         // Slowly move to start of Trajectory
         position_d     <<  position_init + s * (position_d_target - position_init);
         velocity_d     <<                 ds * (position_d_target - position_init);
@@ -206,7 +193,6 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
         domega_d_global        << domega(i,0), domega(i,1), domega(i,2);
     
         if (mytime >= i * ts(0,0) + T && mytime >= ts(0,0) + T && i < X.rows() - 1) {
-
             i++;
         } 
     }
@@ -265,6 +251,7 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
     
     // Saturate torque rate to avoid discontinuities
     tau_d << saturateTorqueRate(tau_d, tau_J_d);
+    
     for (size_t i = 0; i < 7; ++i) {
         joint_handle[i].setCommand(tau_d(i));
     }
@@ -279,8 +266,6 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
 
 Eigen::Matrix<double, 7, 1> CartesianImpedanceTrajectory::saturateTorqueRate(const Eigen::Matrix<double, 7, 1>& tau_d_calculated,
     const Eigen::Matrix<double, 7, 1>& tau_J_d) {
-    
-    Eigen::Matrix<double, 7, 1> tau_d_saturated{};
     
     for (size_t i = 0; i < 7; i++) {
         double difference = tau_d_calculated[i] - tau_J_d[i];
