@@ -114,16 +114,12 @@ void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
     franka::RobotState initial_state = state_handle->getRobotState();
 
     Eigen::Map<Eigen::Matrix<double, 7, 1>> q_initial(initial_state.q.data());
+    Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(initial_state.dq.data());
     TransformationMatrix = Eigen::Matrix4d::Map(initial_state.O_T_EE.data());
     
     std::array<double, 42> jacobian_array = model_handle->getZeroJacobian(franka::Frame::kEndEffector);
-        
     Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
-    jacobian_prev        << jacobian;
-    djacobian.setZero();
     
-    Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(initial_state.dq.data());
-
     // set equilibrium point to current state
     position_init        =   TransformationMatrix.translation();
     orientation_init     =   TransformationMatrix.rotation();
@@ -132,6 +128,8 @@ void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
     position_d_target    <<  position_init; 
     orientation_d_target =   orientation_init;
     q_nullspace          <<  q_initial;
+    jacobian_prev        << jacobian;
+    djacobian.setZero();
 }
 
 void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duration& period) {
@@ -139,10 +137,10 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     mytime = mytime + period.toSec();
     
     // get state variables
-    franka::RobotState robot_state = state_handle->getRobotState();
+    franka::RobotState robot_state        = state_handle->getRobotState();
     std::array<double, 7>  coriolis_array = model_handle->getCoriolis();
     std::array<double, 42> jacobian_array = model_handle->getZeroJacobian(franka::Frame::kEndEffector);
-    std::array<double, 49> mass_array = model_handle->getMass();
+    std::array<double, 49> mass_array     = model_handle->getMass();
     
     // convert to Eigen
     Eigen::Map<Eigen::Matrix<double, 7, 7>> mass(mass_array.data());
