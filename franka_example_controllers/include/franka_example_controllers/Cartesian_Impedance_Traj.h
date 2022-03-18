@@ -135,10 +135,8 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   Eigen::Quaterniond orientation_d;
   Eigen::Quaterniond orientation_init;
   Eigen::Quaterniond orientation_d_target;
-  Eigen::Vector3d    omega_d_local;
-  Eigen::Vector3d    omega_d_global;
-  Eigen::Vector3d    domega_d_local;
-  Eigen::Vector3d    domega_d_global;
+  Eigen::Vector3d    omega_d;
+  Eigen::Vector3d    domega_d;
 
   const double delta_tau_max_{1.0};   
 };

@@ -86,10 +86,6 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     K_p.diagonal() << 700, 700, 700, 40, 40, 15;
     K_d.diagonal() << 40, 40, 40, 0.7, 0.7, 0.4;
     
-//     For the easiest controller  
-//     K_p.diagonal() << 500, 500, 400, 18, 18, 8;
-//     K_d.diagonal() << 30, 30, 30, 0.3, 0.3, 0.3;
-    
     C_hat.setZero();
     
     // Nullspace stiffness and damping
@@ -123,7 +119,7 @@ void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
     std::array<double, 42> jacobian_array = model_handle->getZeroJacobian(franka::Frame::kEndEffector);
         
     Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
-    jacobian_prev << jacobian;
+    jacobian_prev        << jacobian;
     djacobian.setZero();
     
     Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(initial_state.dq.data());
@@ -156,9 +152,8 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(robot_state.dq.data());
     Eigen::Map<Eigen::Matrix<double, 7, 1>> tau_J_d(robot_state.tau_J_d.data());
         
-    mass_inv << mass.inverse();
-    
-    TransformationMatrix = Eigen::Matrix4d::Map(robot_state.O_T_EE.data());
+    mass_inv             << mass.inverse();
+    TransformationMatrix =  Eigen::Matrix4d::Map(robot_state.O_T_EE.data());
     curr_position        =  TransformationMatrix.translation();
     curr_orientation     =  TransformationMatrix.rotation();
     curr_velocity        << jacobian * dq;
@@ -174,34 +169,34 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
 
 //////////////////////////////////////////////   POINT to POINT MOVEMENT  /////////////////////////////////////////
     
-    position_d_target << 0.3, 0, 0.8; 
- //   position_d_target << position_init;
+    position_d_target    << 0.3, 0, 0.8; 
+//     position_d_target    << position_init;
     
-    angles_d_target   <<   0, 60,  0;  // x-axis (roll, points forward)// y-axis (pitch, points to the right)// z-axis (yaw, points downwards)
-                            
+    angles_d_target      <<   0, 60,  0;  // x-axis (roll, points forward)// y-axis (pitch, points to the right)// z-axis (yaw, points downwards)
+    
     orientation_d_target =    Eigen::AngleAxisd(angles_d_target(0) * M_PI/180 +   M_PI, Eigen::Vector3d::UnitX())
                             * Eigen::AngleAxisd(angles_d_target(1) * M_PI/180         , Eigen::Vector3d::UnitY())
                             * Eigen::AngleAxisd(angles_d_target(2) * M_PI/180 + M_PI/4, Eigen::Vector3d::UnitZ()); 
                             
-    omega_d_global.setZero();
-    domega_d_global.setZero();
+    omega_d.setZero();
+    domega_d.setZero();
     
     if (s <= 1) {
         s =       a3 * pow(mytime, 3) +      a4 * pow(mytime, 4) +      a5 * pow(mytime, 5);
         ds =  3 * a3 * pow(mytime, 2) +  4 * a4 * pow(mytime, 3) +  5 * a5 * pow(mytime, 4);
         dds = 6 * a3 *         mytime + 12 * a4 * pow(mytime, 2) + 20 * a5 * pow(mytime, 3); 
         
-        //  // Point to Point movements
+        // Point to Point movements
         position_d     << position_init + s * (position_d_target - position_init);
         velocity_d     << ds * (position_d_target - position_init);
         acceleration_d << dds * (position_d_target - position_init);  
         orientation_d  =  orientation_d.slerp(10/T * s/1000, orientation_d_target);
     }
     else {
-        position_d  << position_d_target;
+        position_d     << position_d_target;
         velocity_d.setZero();
         acceleration_d.setZero();
-        orientation_d = orientation_d.slerp(0.01, orientation_d_target);
+        orientation_d  = orientation_d.slerp(0.01, orientation_d_target);
     }
     
 ///////////////////////////////////// COMPUTE ERRORS //////////////////////////////////////////////////////
@@ -214,46 +209,39 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         curr_orientation.coeffs() << -curr_orientation.coeffs(); // take short way around the circle and by using positve dot product of quaternions
     }
     
-    quat_d << orientation_d.x(), orientation_d.y(), orientation_d.z();
-    quat_c << curr_orientation.x(), curr_orientation.y(), curr_orientation.z();
+    quat_d         <<    orientation_d.x(),    orientation_d.y(),    orientation_d.z();
+    quat_c         << curr_orientation.x(), curr_orientation.y(), curr_orientation.z();
                 
-    error.tail(3)  << -( curr_orientation.w() * quat_d - orientation_d.w() * quat_c - quat_d.cross(quat_c));  
+    error.tail(3)  << -(curr_orientation.w() * quat_d - orientation_d.w() * quat_c - quat_d.cross(quat_c));  
     
     // VELOCITY ERROR
-    derror         << curr_velocity;
-    derror.head(3) << derror.head(3) - velocity_d;
-    derror.tail(3) << derror.tail(3) - omega_d_global;
+    derror.head(3) << curr_velocity.head(3) - velocity_d;
+    derror.tail(3) << curr_velocity.tail(3) - omega_d;
 
     // ACCELERATION VECTOR
-    ddx.head(3)   << acceleration_d; 
-    ddx.tail(3)   << domega_d_global;    
+    ddx.head(3)    << acceleration_d; 
+    ddx.tail(3)    << domega_d;    
     
 ////////////////////////////////////////// CONTROLLER //////////////////////////////////////////////////////
-    
 ///////////////////  Paper: Cartesian Impedance Control of Redundant Robots:       /////////////////////////
 //////////////////          Recent Results with the DLR-Light-Weight-Arms, DLR    //////////////////////////
 
-    Lambda << (jacobian * mass_inv * jacobian.transpose()).inverse();
+    Lambda         << (jacobian * mass_inv * jacobian.transpose()).inverse();
     
     if (notFirstRun) {
-        C_hat << 0.5 * (Lambda - Lambda_prev) / period.toSec();
+        C_hat      << 0.5 * (Lambda - Lambda_prev) / period.toSec();
     } 
     
-    F_tau << Lambda * ddx - K_d * derror - K_p * error - C_hat * derror - Lambda * djacobian_filtered * dq;
-            
-//     F_tau <<   -(K_d * derror + K_p * error);
+    F_tau          << Lambda * ddx - K_d * derror - K_p * error - C_hat * derror - Lambda * djacobian_filtered * dq;
+    tau_task       << jacobian.transpose() * F_tau;
     
-    tau_task << jacobian.transpose() * F_tau;
-    
-//     nullspace PD control
-    N << I - jacobian.transpose() * Lambda * jacobian * mass_inv;
-    tau_nullspace << N * (-K_N * (q - q_nullspace) - D_N * dq);
+//     nullspace control
+    N              << I - jacobian.transpose() * Lambda * jacobian * mass_inv;
+    tau_nullspace  << N * (-K_N * (q - q_nullspace) - D_N * dq);
     
 //     Desired torque
-    tau_d << tau_task + coriolis + tau_nullspace;
-
-    q_nullspace << q;
-    
+    tau_d          << tau_task + coriolis + tau_nullspace;
+    q_nullspace    << q;
 /////////////////////////////////////////// end of controller ///////////////////////////////////////////////  
     
     // Saturate torque rate to avoid discontinuities
@@ -267,8 +255,8 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
 
     // UPDATE VALUES FOR FINITE DIFFERENCES
     jacobian_prev << jacobian;
-    Lambda_prev << Lambda;
-    notFirstRun = true;
+    Lambda_prev   << Lambda;
+    notFirstRun   = true;
 }
 
 Eigen::Matrix<double, 7, 1> CartesianImpedanceP2P::saturateTorqueRate(const Eigen::Matrix<double, 7, 1>& tau_d_calculated,
