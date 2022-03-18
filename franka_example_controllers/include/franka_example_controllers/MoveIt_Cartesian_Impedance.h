@@ -104,6 +104,7 @@ class CartesianImpedanceMoveIt : public controller_interface::MultiInterfaceCont
   Eigen::Vector3d    domega_d;
 
   const double delta_tau_max_{1.0};   
+
 };
 
 }  // namespace franka_example_controllers

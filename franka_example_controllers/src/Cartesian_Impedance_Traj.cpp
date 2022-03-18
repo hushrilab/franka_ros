@@ -74,15 +74,15 @@ bool CartesianImpedanceTrajectory::init(hardware_interface::RobotHW* robot_hw,
     
     //   For Impedance Controller
     K_p.diagonal() << 700, 700, 700, 40, 40, 15;
-    K_d.diagonal() << 40, 40, 40, 0.8, 0.8, 0.8;
+    K_d.diagonal() << 40, 40, 40, 0.8, 0.8, 0.4;
     
     C_hat.setZero();
     
     // Nullspace stiffness and damping
     K_N.setIdentity();
     D_N.setIdentity();
-    K_N << K_N * 15;
-    D_N << D_N * 0.5 * sqrt(K_N(0,0));  
+    K_N << K_N * 25;
+    D_N << D_N /** 0.7*/ * sqrt(K_N(0,0));  
     I.setIdentity();
     
     notFirstRun = false;
@@ -182,12 +182,16 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
         orientation_d.coeffs() <<  Quats(i,1),  Quats(i,2),  Quats(i,3), Quats(i,0);
         omega_d                <<  omega(i,0),  omega(i,1),  omega(i,2);
         domega_d               << domega(i,0), domega(i,1), domega(i,2);
+        q_nullspace            << q_null(i,0), q_null(i,1), q_null(i,2), q_null(i,3), q_null(i,4), q_null(i,5), q_null(i,6); 
     
         if (mytime >= i * ts(0,0) + T && mytime >= ts(0,0) + T && i < X.rows() - 1) {
             i++;
         } 
     }
     
+    if (i >= X.rows() - 1){    //free nullspace movement, when trajectory finished
+        q_nullspace << q;
+    } 
 /////////////////////////////////////////// COMPUTE ERRORS ///////////////////////////////////////////////////
     
     // POSITION ERROR
@@ -231,9 +235,6 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
 //     Desired torque
     tau_d          << tau_task + coriolis + tau_nullspace;
     
-    if (i >= X.rows() - 1){    //free nullspace movement, when trajector finished
-        q_nullspace << q;
-    } 
 /////////////////////////////////////////// end of controller ///////////////////////////////////////////////  
     
     // Saturate torque rate to avoid discontinuities

@@ -6,6 +6,14 @@
 #include <pluginlib/class_list_macros.h>
 #include <ros/ros.h>
 
+#include <moveit/move_group_interface/move_group_interface.h>
+#include <moveit/planning_scene_interface/planning_scene_interface.h>
+// #include <moveit_msgs/DisplayRobotState.h>
+// #include <moveit_msgs/DisplayTrajectory.h>
+// #include <moveit_msgs/AttachedCollisionObject.h>
+// #include <moveit_msgs/CollisionObject.h>
+// #include <moveit_visual_tools/moveit_visual_tools.h>
+
 namespace franka_example_controllers {
 
 bool CartesianImpedanceMoveIt::init(hardware_interface::RobotHW* robot_hw,
@@ -99,6 +107,10 @@ bool CartesianImpedanceMoveIt::init(hardware_interface::RobotHW* robot_hw,
     s   =    0;
     ds  =    0;
     dds =    0;
+    
+    
+  //////////////////////////// MoveIt ///////////////////////////////////////////////  
+
 
     return true;
 }
@@ -124,6 +136,79 @@ void CartesianImpedanceMoveIt::starting(const ros::Time& /*time*/) {
     q_nullspace          <<  q_initial;
     jacobian_prev        <<  jacobian;
     djacobian.setZero();
+    
+  // Setup
+  // ^^^^^
+  //
+  // MoveIt operates on sets of joints called "planning groups" and stores them in an object called
+  // the `JointModelGroup`. Throughout MoveIt the terms "planning group" and "joint model group"
+  // are used interchangeably.
+  static const std::string PLANNING_GROUP = "panda_arm";
+
+  // The :planning_interface:`MoveGroupInterface` class can be easily
+  // setup using just the name of the planning group you would like to control and plan for.
+  moveit::planning_interface::MoveGroupInterface move_group_interface(PLANNING_GROUP);
+
+  // We will use the :planning_interface:`PlanningSceneInterface`
+  // class to add and remove collision objects in our "virtual world" scene
+  moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
+
+  // Raw pointers are frequently used to refer to the planning group for improved performance.
+  const moveit::core::JointModelGroup* joint_model_group =
+      move_group_interface.getCurrentState()->getJointModelGroup(PLANNING_GROUP);
+      
+    // Cartesian Paths
+  // ^^^^^^^^^^^^^^^
+  //  The initial pose (start state) does not
+  // need to be added to the waypoint list but adding it can help with visualizations
+    
+  geometry_msgs::Pose start_pose;
+  start_pose.orientation.w = orientation_init.w();
+  start_pose.orientation.x = orientation_init.x();
+  start_pose.orientation.y = orientation_init.y();
+  start_pose.orientation.z = orientation_init.z();
+  start_pose.position.x = position_init(0);
+  start_pose.position.y = position_init(1);
+  start_pose.position.z = position_init(2);
+  
+  geometry_msgs::Pose waypoint_1;
+  waypoint_1.orientation.w = orientation_init.w();
+  waypoint_1.orientation.x = orientation_init.x();
+  waypoint_1.orientation.y = orientation_init.y();
+  waypoint_1.orientation.z = orientation_init.z();
+  waypoint_1.position.x = 0.4;
+  waypoint_1.position.y = 0.4;
+  waypoint_1.position.z = 0.6;
+  
+  geometry_msgs::Pose end_pose;
+  end_pose.orientation.w = orientation_init.w();
+  end_pose.orientation.x = orientation_init.x();
+  end_pose.orientation.y = orientation_init.y();
+  end_pose.orientation.z = orientation_init.z();
+  end_pose.position.x = 0.3;
+  end_pose.position.y = 0.0;
+  end_pose.position.z = 0.8;
+  
+  std::vector<geometry_msgs::Pose> waypoints;
+  waypoints.push_back(start_pose);
+  waypoints.push_back(waypoint_1);
+  waypoints.push_back(end_pose);
+  
+  // We want the Cartesian path to be interpolated at a resolution of 1 cm
+  // which is why we will specify 0.01 as the max step in Cartesian
+  // translation.  We will specify the jump threshold as 0.0, effectively disabling it.
+  // Warning - disabling the jump threshold while operating real hardware can cause
+  // large unpredictable motions of redundant joints and could be a safety issue
+  moveit_msgs::RobotTrajectory trajectory;
+  const double jump_threshold = 0.0;
+  const double eef_step = 0.01;
+  double fraction = move_group_interface.computeCartesianPath(waypoints, eef_step, jump_threshold, trajectory);
+  
+  geometry_msgs::Point translation;
+  geometry_msgs::Quaternion rotation;
+  
+  std::cout<< translation <<std::endl;
+//   ROS_INFO_NAMED("tutorial", "Test", fraction * 100.0);
 }
 
 void CartesianImpedanceMoveIt::update(const ros::Time& /*time*/, const ros::Duration& period) {

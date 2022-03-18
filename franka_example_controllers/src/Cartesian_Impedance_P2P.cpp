@@ -92,7 +92,7 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     K_N.setIdentity();
     D_N.setIdentity();
     K_N << K_N * 25;
-    D_N << D_N * 0.7;  
+    D_N << D_N * 0.5 * sqrt(K_N(0,0));  
     I.setIdentity();
     
     notFirstRun = false;
