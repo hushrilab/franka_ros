@@ -74,6 +74,7 @@ add_library(franka_example_controllers
   src/hennings_controller.cpp
   src/Cartesian_Impedance_P2P.cpp
   src/Cartesian_Impedance_Traj.cpp
+  src/MoveIt_Cartesian_Impedance.cpp
 )
 
 add_dependencies(franka_example_controllers

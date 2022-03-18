@@ -69,4 +69,9 @@
           Cartesian Impedance Controller written by Henning that follows Trajectory provided by CSV file
       </description>
   </class>
+  <class name="franka_example_controllers/CartesianImpedanceMoveIt" type="franka_example_controllers::CartesianImpedanceMoveIt" base_class_type="controller_interface::ControllerBase">
+      <description>
+          Cartesian Impedance Controller written by Henning that follows Trajectory generated with MoveIt
+      </description>
+  </class>
 </library>

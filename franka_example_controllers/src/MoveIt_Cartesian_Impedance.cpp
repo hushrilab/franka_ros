@@ -1,5 +1,5 @@
 
-#include <franka_example_controllers/Cartesian_Impedance_P2P.h>
+#include <franka_example_controllers/MoveIt_Cartesian_Impedance.h>
 
 #include <controller_interface/controller_base.h>
 #include <franka/robot_state.h>
@@ -8,66 +8,56 @@
 
 namespace franka_example_controllers {
 
-bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
+bool CartesianImpedanceMoveIt::init(hardware_interface::RobotHW* robot_hw,
                                                ros::NodeHandle& node_handle) {
-
     std::string arm_id;
     if (!node_handle.getParam("arm_id", arm_id)) {
-        ROS_ERROR_STREAM("CartesianImpedanceP2P: Could not read parameter arm_id");
+        ROS_ERROR_STREAM("CartesianImpedanceMoveIt: Could not read parameter arm_id");
         return false;
     }
     std::vector<std::string> joint_names;
     if (!node_handle.getParam("joint_names", joint_names) || joint_names.size() != 7) {
-        ROS_ERROR(
-            "CartesianImpedanceP2P: Invalid or no joint_names parameters provided, "
+        ROS_ERROR("CartesianImpedanceMoveIt: Invalid or no joint_names parameters provided, "
             "aborting controller init!");
         return false;
     }
 
     auto* model_interface = robot_hw->get<franka_hw::FrankaModelInterface>();
     if (model_interface == nullptr) {
-        ROS_ERROR_STREAM(
-            "CartesianImpedanceP2P: Error getting model interface from hardware");
+        ROS_ERROR_STREAM("CartesianImpedanceMoveIt: Error getting model interface from hardware");
         return false;
     }
     try {
-        model_handle = std::make_unique<franka_hw::FrankaModelHandle>(
-            model_interface->getHandle(arm_id + "_model"));
-    } catch (hardware_interface::HardwareInterfaceException& ex) {
-        ROS_ERROR_STREAM(
-            "CartesianImpedanceP2P: Exception getting model handle from interface: "
-            << ex.what());
+        model_handle = std::make_unique<franka_hw::FrankaModelHandle>(model_interface->getHandle(arm_id + "_model"));
+    } 
+    catch (hardware_interface::HardwareInterfaceException& ex) {
+        ROS_ERROR_STREAM("CartesianImpedanceMoveIt: Exception getting model handle from interface: "<< ex.what());
         return false;
     }
 
     auto* state_interface = robot_hw->get<franka_hw::FrankaStateInterface>();
     if (state_interface == nullptr) {
-        ROS_ERROR_STREAM(
-            "CartesianImpedanceP2P: Error getting state interface from hardware");
+        ROS_ERROR_STREAM("CartesianImpedanceMoveIt: Error getting state interface from hardware");
         return false;
     }
     try {
-        state_handle = std::make_unique<franka_hw::FrankaStateHandle>(
-            state_interface->getHandle(arm_id + "_robot"));
-    } catch (hardware_interface::HardwareInterfaceException& ex) {
-        ROS_ERROR_STREAM(
-            "CartesianImpedanceP2P: Exception getting state handle from interface: "
-            << ex.what());
+        state_handle = std::make_unique<franka_hw::FrankaStateHandle>(state_interface->getHandle(arm_id + "_robot"));
+    } 
+    catch (hardware_interface::HardwareInterfaceException& ex) {
+        ROS_ERROR_STREAM("CartesianImpedanceMoveIt: Exception getting state handle from interface: "<< ex.what());
         return false;
     }
 
     auto* effort_joint_interface = robot_hw->get<hardware_interface::EffortJointInterface>();
     if (effort_joint_interface == nullptr) {
-        ROS_ERROR_STREAM(
-            "CartesianImpedanceP2P: Error getting effort joint interface from hardware");
+        ROS_ERROR_STREAM("CartesianImpedanceMoveIt: Error getting effort joint interface from hardware");
         return false;
     }
     for (size_t i = 0; i < 7; ++i) {
         try {
         joint_handle.push_back(effort_joint_interface->getHandle(joint_names[i]));
         } catch (const hardware_interface::HardwareInterfaceException& ex) {
-        ROS_ERROR_STREAM(
-            "CartesianImpedanceP2P: Exception getting joint handles: " << ex.what());
+        ROS_ERROR_STREAM("CartesianImpedanceMoveIt: Exception getting joint handles: " << ex.what());
         return false;
         }
     }
@@ -76,7 +66,7 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     position_d                    << 0.5,   0, 0.5;
     orientation_d.coeffs()        << 0.0, 1.0, 0.0, 0.0;
     position_d_target             << 0.5,   0, 0.5;
-    orientation_d_target.coeffs() << 0.0, 1.0, 0.0, 0.0;   
+    orientation_d_target.coeffs() << 0.0, 1.0, 0.0, 0.0;  
     ddx.setZero();
     error.setZero();
     derror.setZero();
@@ -84,15 +74,19 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     
     //   For Impedance Controller
     K_p.diagonal() << 700, 700, 700, 40, 40, 15;
-    K_d.diagonal() << 40, 40, 40, 0.7, 0.7, 0.4;
+    K_d.diagonal() << 40, 40, 40, 0.8, 0.8, 0.8;
+    
+//     For the easiest controller  
+//     K_p.diagonal() << 500, 500, 400, 18, 18, 8;
+//     K_d.diagonal() << 30, 30, 30, 0.3, 0.3, 0.3;
     
     C_hat.setZero();
     
     // Nullspace stiffness and damping
     K_N.setIdentity();
     D_N.setIdentity();
-    K_N << K_N * 25;
-    D_N << D_N * 0.7;  
+    K_N << K_N * 15;
+    D_N << D_N * 0.5 * sqrt(K_N(0,0));  
     I.setIdentity();
     
     notFirstRun = false;
@@ -105,11 +99,11 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     s   =    0;
     ds  =    0;
     dds =    0;
-    
+
     return true;
 }
 
-void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
+void CartesianImpedanceMoveIt::starting(const ros::Time& /*time*/) {
 
     franka::RobotState initial_state = state_handle->getRobotState();
 
@@ -119,7 +113,7 @@ void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
     
     std::array<double, 42> jacobian_array = model_handle->getZeroJacobian(franka::Frame::kEndEffector);
     Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
-    
+
     // set equilibrium point to current state
     position_init        =   TransformationMatrix.translation();
     orientation_init     =   TransformationMatrix.rotation();
@@ -132,10 +126,10 @@ void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
     djacobian.setZero();
 }
 
-void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duration& period) {
+void CartesianImpedanceMoveIt::update(const ros::Time& /*time*/, const ros::Duration& period) {
     
     mytime = mytime + period.toSec();
-    
+
     // get state variables
     franka::RobotState robot_state        = state_handle->getRobotState();
     std::array<double, 7>  coriolis_array = model_handle->getCoriolis();
@@ -157,7 +151,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     curr_velocity        << jacobian * dq;
    
     if (notFirstRun){ // in first run, period.toSec() is zero
-            djacobian << (jacobian - jacobian_prev) / period.toSec();
+        djacobian << (jacobian - jacobian_prev) / period.toSec();
     }
     
     // FILTER SIGNALS 
@@ -196,8 +190,8 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         acceleration_d.setZero();
         orientation_d  = orientation_d.slerp(0.01, orientation_d_target);
     }
-    
-///////////////////////////////////// COMPUTE ERRORS //////////////////////////////////////////////////////
+        
+/////////////////////////////////////////// COMPUTE ERRORS ///////////////////////////////////////////////////
     
     // POSITION ERROR
     error.head(3)  << curr_position - position_d;
@@ -218,7 +212,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
 
     // ACCELERATION VECTOR
     ddx.head(3)    << acceleration_d; 
-    ddx.tail(3)    << domega_d;    
+    ddx.tail(3)    << domega_d;  
     
 ////////////////////////////////////////// CONTROLLER //////////////////////////////////////////////////////
 ///////////////////  Paper: Cartesian Impedance Control of Redundant Robots:       /////////////////////////
@@ -233,13 +227,14 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     F_tau          << Lambda * ddx - K_d * derror - K_p * error - C_hat * derror - Lambda * djacobian_filtered * dq;
     tau_task       << jacobian.transpose() * F_tau;
     
-//     nullspace control
+//     nullspace PD control
     N              << I - jacobian.transpose() * Lambda * jacobian * mass_inv;
     tau_nullspace  << N * (-K_N * (q - q_nullspace) - D_N * dq);
     
 //     Desired torque
     tau_d          << tau_task + coriolis + tau_nullspace;
-    q_nullspace    << q;
+    q_nullspace << q;
+
 /////////////////////////////////////////// end of controller ///////////////////////////////////////////////  
     
     // Saturate torque rate to avoid discontinuities
@@ -257,7 +252,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     notFirstRun   =  true;
 }
 
-Eigen::Matrix<double, 7, 1> CartesianImpedanceP2P::saturateTorqueRate(const Eigen::Matrix<double, 7, 1>& tau_d_calculated,
+Eigen::Matrix<double, 7, 1> CartesianImpedanceMoveIt::saturateTorqueRate(const Eigen::Matrix<double, 7, 1>& tau_d_calculated,
     const Eigen::Matrix<double, 7, 1>& tau_J_d) {
     
     for (size_t i = 0; i < 7; i++) {
@@ -267,8 +262,8 @@ Eigen::Matrix<double, 7, 1> CartesianImpedanceP2P::saturateTorqueRate(const Eige
     return tau_d_saturated;
 }
   
-void CartesianImpedanceP2P::Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input, 
-    const Eigen::MatrixXd& y_prev,   Eigen::MatrixXd& y) {
+void CartesianImpedanceMoveIt::Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input, 
+    const Eigen::MatrixXd& y_prev, Eigen::MatrixXd& y) {
         
     y.resize(rows,cols);
     y << (1 - filter_param) * y_prev + filter_param * input;
@@ -276,5 +271,5 @@ void CartesianImpedanceP2P::Filter(double filter_param, int rows, int cols, cons
 
 }  // namespace franka_example_controllers
 
-PLUGINLIB_EXPORT_CLASS(franka_example_controllers::CartesianImpedanceP2P,
+PLUGINLIB_EXPORT_CLASS(franka_example_controllers::CartesianImpedanceMoveIt,
                        controller_interface::ControllerBase)

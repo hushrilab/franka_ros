@@ -76,10 +76,6 @@ bool CartesianImpedanceTrajectory::init(hardware_interface::RobotHW* robot_hw,
     K_p.diagonal() << 700, 700, 700, 40, 40, 15;
     K_d.diagonal() << 40, 40, 40, 0.8, 0.8, 0.8;
     
-//     For the easiest controller  
-//     K_p.diagonal() << 500, 500, 400, 18, 18, 8;
-//     K_d.diagonal() << 30, 30, 30, 0.3, 0.3, 0.3;
-    
     C_hat.setZero();
     
     // Nullspace stiffness and damping
@@ -122,7 +118,7 @@ void CartesianImpedanceTrajectory::starting(const ros::Time& /*time*/) {
     position_d_target    <<  position_init; 
     orientation_d_target =   orientation_init;
     q_nullspace          <<  q_initial;
-    jacobian_prev        << jacobian;
+    jacobian_prev        <<  jacobian;
     djacobian.setZero();
 }
 
@@ -161,8 +157,7 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
 
 ///////////////////////////////////////////////   FOLLOW TRAJECTORY  /////////////////////////////////////////
  
-    position_d_target << X(0,0),   X(0,1),   X(0,2);
-
+    position_d_target             <<     X(0,0),      X(0,1),      X(0,2);
     orientation_d_target.coeffs() << Quats(0,1),  Quats(0,2),  Quats(0,3), Quats(0,0);
                           
     omega_d.setZero();
@@ -253,14 +248,14 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
     // UPDATE VALUES FOR FINITE DIFFERENCES
     jacobian_prev << jacobian;
     Lambda_prev   << Lambda;
-    notFirstRun   = true;
+    notFirstRun   =  true;
 }
 
 Eigen::Matrix<double, 7, 1> CartesianImpedanceTrajectory::saturateTorqueRate(const Eigen::Matrix<double, 7, 1>& tau_d_calculated,
     const Eigen::Matrix<double, 7, 1>& tau_J_d) {
     
     for (size_t i = 0; i < 7; i++) {
-        double difference = tau_d_calculated[i] - tau_J_d[i];
+        double difference  = tau_d_calculated[i] - tau_J_d[i];
         tau_d_saturated[i] = tau_J_d[i] + std::max(std::min(difference, delta_tau_max_), -delta_tau_max_);
     }
     return tau_d_saturated;

@@ -23,7 +23,7 @@
 
 namespace franka_example_controllers {
 
-class CartesianImpedanceTrajectory : public controller_interface::MultiInterfaceController<
+class CartesianImpedanceMoveIt : public controller_interface::MultiInterfaceController<
                                                 franka_hw::FrankaModelInterface,
                                                 hardware_interface::EffortJointInterface,
                                                 franka_hw::FrankaStateInterface> {
@@ -41,43 +41,10 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   // Filter
   void Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input,  const Eigen::MatrixXd& input_prev, Eigen::MatrixXd& y);
   
-  //  Function to lad csv files; Source: https://stackoverflow.com/questions/34247057/how-to-read-csv-file-and-assign-to-eigen-matrix
-  template<typename M> M load_csv (const std::string & path, const std::string & filename) {
-    std::ifstream indata;
-    indata.open(path + filename);
-    std::string line;
-    std::vector<double> values;
-    uint rows = 0;
-    while (std::getline(indata, line)) {
-        std::stringstream lineStream(line);
-        std::string cell;
-        while (std::getline(lineStream, cell, ',')) {
-            values.push_back(std::stod(cell));
-        }
-        ++rows;
-    }
-    return Eigen::Map<const Eigen::Matrix<typename M::Scalar, M::RowsAtCompileTime, M::ColsAtCompileTime, Eigen::RowMajor>>(values.data(), rows, values.size()/rows);
-  }
-  
   std::unique_ptr<franka_hw::FrankaStateHandle> state_handle;
   std::unique_ptr<franka_hw::FrankaModelHandle> model_handle;
   std::vector<hardware_interface::JointHandle>  joint_handle;
   
-  // Load MATLAB trajectory
-
-   std::string path = "../rospackages/catkin_ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/";
-//    std::string path = "../ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/";
-
-  
-  Eigen::MatrixXd X      = load_csv<Eigen::MatrixXd>(path,      "x.csv");
-  Eigen::MatrixXd dX     = load_csv<Eigen::MatrixXd>(path,     "dx.csv");
-  Eigen::MatrixXd ddX    = load_csv<Eigen::MatrixXd>(path,    "ddx.csv");
-  Eigen::MatrixXd Quats  = load_csv<Eigen::MatrixXd>(path,  "quats.csv");
-  Eigen::MatrixXd omega  = load_csv<Eigen::MatrixXd>(path,  "omega.csv");
-  Eigen::MatrixXd domega = load_csv<Eigen::MatrixXd>(path, "domega.csv");
-  Eigen::MatrixXd ts     = load_csv<Eigen::MatrixXd>(path,     "ts.csv");
-  
-  double i = 0;
   double mytime = 0;
 
   // for quintic trajectory
