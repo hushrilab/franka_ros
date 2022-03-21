@@ -11,7 +11,6 @@
 #include <franka_gripper/MoveAction.h>
 #include <franka_gripper/StopAction.h>
 #include <franka_gripper/HomingAction.h>
-#include <ros/node_handle.h>
 #include <franka/gripper_state.h>
 #include <franka/gripper.h>
 
@@ -105,7 +104,7 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     notFirstRun = false;
     
     // define time of quintic trajectory
-    T   =   5;
+    T   =   1;
     a3  =   10 / pow(T, 3);
     a4  = - 15 / pow(T, 4);
     a5  =    6 / pow(T, 5);
@@ -181,10 +180,10 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
 
 //////////////////////////////////////////////   POINT to POINT MOVEMENT  /////////////////////////////////////////
     
-    position_d_target    << 0.3, 0, 0.8; 
-//     position_d_target    << position_init;
+//     position_d_target    << 0.3, 0, 0.8; 
+    position_d_target    << position_init;
     
-    angles_d_target      <<   0, 60,  0;  // x-axis (roll, points forward)// y-axis (pitch, points to the right)// z-axis (yaw, points downwards)
+    angles_d_target      <<   0, 0,  -45;  // x-axis (roll, points forward)// y-axis (pitch, points to the right)// z-axis (yaw, points downwards)
     
     orientation_d_target =    Eigen::AngleAxisd(angles_d_target(0) * M_PI/180 +   M_PI, Eigen::Vector3d::UnitX())
                             * Eigen::AngleAxisd(angles_d_target(1) * M_PI/180         , Eigen::Vector3d::UnitY())
@@ -199,9 +198,9 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         dds = 6 * a3 *         mytime + 12 * a4 * pow(mytime, 2) + 20 * a5 * pow(mytime, 3); 
         
         // Point to Point movements
-        position_d     << position_init + s * (position_d_target - position_init);
-        velocity_d     << ds * (position_d_target - position_init);
-        acceleration_d << dds * (position_d_target - position_init);  
+        position_d     <<  position_init + s * (position_d_target - position_init);
+        velocity_d     <<                 ds * (position_d_target - position_init);
+        acceleration_d <<                dds * (position_d_target - position_init);  
         orientation_d  =  orientation_d.slerp(10/T * s/1000, orientation_d_target);
     }
     else {
@@ -209,20 +208,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         velocity_d.setZero();
         acceleration_d.setZero();
         orientation_d  = orientation_d.slerp(0.01, orientation_d_target);
-        
-        if (freq_counter >= 0.1 && mytime < 10) {     // panda hand only has a 10 Hz control rate
-            franka_gripper::MoveGoal goal;
-            goal.width = 0.01;
-            goal.speed = 0.1;           //  Closing speed. [m/s]
-    //         goal.force = 60;            //   Grasping (continuous) force [N]
-    //         goal.epsilon.inner = 0.05;  // Maximum tolerated deviation when the actual grasped width is
-    //                             // smaller than the commanded grasp width.
-    //         goal.epsilon.outer = 0.05;  // Maximum tolerated deviation when the actual grasped width is
-    //                             // larger than the commanded grasp width.
-            move.sendGoal(goal);          // Sending the Grasp command to gripper
-            freq_counter = 0;
-        }
-        freq_counter = freq_counter + period.toSec();
+        GripperMove(0.05, 0.03, freq_counter);
     }
     
 ///////////////////////////////////// COMPUTE ERRORS /////////////////////´/////////////////////////////////
@@ -300,6 +286,23 @@ void CartesianImpedanceP2P::Filter(double filter_param, int rows, int cols, cons
         
     y.resize(rows,cols);
     y << (1 - filter_param) * y_prev + filter_param * input;
+}
+
+void CartesianImpedanceP2P::GripperMove(double width, double speed, int & freq_counter) {
+    
+    freq_counter++;
+
+    if (freq_counter >= 100) {     // panda gripper only has a 10 Hz control rate
+        if (flag) {
+           std::cout<< *move.getResult()<<std::endl;
+        }
+        franka_gripper::MoveGoal goal;
+        goal.width = width;
+        goal.speed = speed;
+        move.sendGoal(goal); 
+        freq_counter = 0;
+        flag = true;
+    }
 }
 
 }  // namespace franka_example_controllers

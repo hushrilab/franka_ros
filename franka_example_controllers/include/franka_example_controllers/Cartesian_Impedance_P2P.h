@@ -16,7 +16,6 @@
 #include <ros/time.h>
 #include <Eigen/Dense>
 
-#include <franka_example_controllers/compliance_paramConfig.h>
 #include <franka_hw/franka_model_interface.h>
 #include <franka_hw/franka_state_interface.h>
 
@@ -39,13 +38,16 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   
   // Filter
   void Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input,  const Eigen::MatrixXd& input_prev, Eigen::MatrixXd& y);
+  
+  void GripperMove(double width, double speed, int & freq_counter); 
 
   std::unique_ptr<franka_hw::FrankaStateHandle> state_handle;
   std::unique_ptr<franka_hw::FrankaModelHandle> model_handle;
   std::vector<hardware_interface::JointHandle>  joint_handle;
   
   double mytime = 0;
-  double freq_counter = 0;
+  int freq_counter = 0;
+  bool flag = false;
   
   // Errors
   Eigen::Matrix<double, 6, 1> error;
