@@ -45,6 +45,7 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   std::vector<hardware_interface::JointHandle>  joint_handle;
   
   double mytime = 0;
+  double freq_counter = 0;
   
   // Errors
   Eigen::Matrix<double, 6, 1> error;

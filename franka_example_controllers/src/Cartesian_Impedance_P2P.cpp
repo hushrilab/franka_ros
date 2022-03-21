@@ -6,6 +6,15 @@
 #include <pluginlib/class_list_macros.h>
 #include <ros/ros.h>
 
+#include <actionlib/client/simple_action_client.h>
+#include <franka_gripper/GraspAction.h>
+#include <franka_gripper/MoveAction.h>
+#include <franka_gripper/StopAction.h>
+#include <franka_gripper/HomingAction.h>
+#include <ros/node_handle.h>
+#include <franka/gripper_state.h>
+#include <franka/gripper.h>
+
 namespace franka_example_controllers {
 
 bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
@@ -31,8 +40,7 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
         return false;
     }
     try {
-        model_handle = std::make_unique<franka_hw::FrankaModelHandle>(
-            model_interface->getHandle(arm_id + "_model"));
+        model_handle = std::make_unique<franka_hw::FrankaModelHandle>(model_interface->getHandle(arm_id + "_model"));
     } catch (hardware_interface::HardwareInterfaceException& ex) {
         ROS_ERROR_STREAM(
             "CartesianImpedanceP2P: Exception getting model handle from interface: "
@@ -47,8 +55,7 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
         return false;
     }
     try {
-        state_handle = std::make_unique<franka_hw::FrankaStateHandle>(
-            state_interface->getHandle(arm_id + "_robot"));
+        state_handle = std::make_unique<franka_hw::FrankaStateHandle>(state_interface->getHandle(arm_id + "_robot"));
     } catch (hardware_interface::HardwareInterfaceException& ex) {
         ROS_ERROR_STREAM(
             "CartesianImpedanceP2P: Exception getting state handle from interface: "
@@ -132,6 +139,13 @@ void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
     djacobian.setZero();
 }
 
+  ///////////////////////////// Gripper /////////////////////////////////
+ 
+  actionlib::SimpleActionClient<franka_gripper::MoveAction>   move( "franka_gripper/move", true);
+  actionlib::SimpleActionClient<franka_gripper::GraspAction> grasp("franka_gripper/grasp", true);
+  actionlib::SimpleActionClient<franka_gripper::StopAction>   stop( "franka_gripper/stop", true);
+  actionlib::SimpleActionClient<franka_gripper::HomingAction> home( "franka_gripper/home", true);
+    
 void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duration& period) {
     
     mytime = mytime + period.toSec();
@@ -195,9 +209,23 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         velocity_d.setZero();
         acceleration_d.setZero();
         orientation_d  = orientation_d.slerp(0.01, orientation_d_target);
+        
+        if (freq_counter >= 0.1 && mytime < 10) {     // panda hand only has a 10 Hz control rate
+            franka_gripper::MoveGoal goal;
+            goal.width = 0.01;
+            goal.speed = 0.1;           //  Closing speed. [m/s]
+    //         goal.force = 60;            //   Grasping (continuous) force [N]
+    //         goal.epsilon.inner = 0.05;  // Maximum tolerated deviation when the actual grasped width is
+    //                             // smaller than the commanded grasp width.
+    //         goal.epsilon.outer = 0.05;  // Maximum tolerated deviation when the actual grasped width is
+    //                             // larger than the commanded grasp width.
+            move.sendGoal(goal);          // Sending the Grasp command to gripper
+            freq_counter = 0;
+        }
+        freq_counter = freq_counter + period.toSec();
     }
     
-///////////////////////////////////// COMPUTE ERRORS //////////////////////////////////////////////////////
+///////////////////////////////////// COMPUTE ERRORS /////////////////////´/////////////////////////////////
     
     // POSITION ERROR
     error.head(3)  << curr_position - position_d;
