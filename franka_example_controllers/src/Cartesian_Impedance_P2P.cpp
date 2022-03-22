@@ -208,7 +208,13 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         velocity_d.setZero();
         acceleration_d.setZero();
         orientation_d  = orientation_d.slerp(0.01, orientation_d_target);
-        GripperMove(0.05, 0.03, freq_counter);
+//         std::cout<<move.isServerConnected()<<std::endl;
+        if(GripperTask == 1) {
+            GripperMove(0.06, 0.03, freq_counter);
+        }
+        if(GripperTask == 2) {
+            GripperMove(0.01, 0.03, freq_counter);
+        }
     }
     
 ///////////////////////////////////// COMPUTE ERRORS /////////////////////´/////////////////////////////////
@@ -292,17 +298,24 @@ void CartesianImpedanceP2P::GripperMove(double width, double speed, int & freq_c
     
     freq_counter++;
 
-    if (freq_counter >= 100) {     // panda gripper only has a 10 Hz control rate
-        if (flag) {
-           std::cout<< *move.getResult()<<std::endl;
+//     if (freq_counter >= 100) {     // panda gripper only has a 10 Hz control rate
+        if (!skipFirstRun) {
+            if(move.getResult()->success) {              
+                stop.sendGoal(franka_gripper::StopGoal());
+                std::cout<<"Gripper open"<<std::endl;
+                GripperTask++;
+                skipFirstRun = true;
+//                 freq_counter = 0;
+                return;
+            }
         }
         franka_gripper::MoveGoal goal;
         goal.width = width;
         goal.speed = speed;
-        move.sendGoal(goal); 
-        freq_counter = 0;
-        flag = true;
-    }
+        move.sendGoal(goal);
+        skipFirstRun = false;
+//         freq_counter = 0;
+//     }
 }
 
 }  // namespace franka_example_controllers

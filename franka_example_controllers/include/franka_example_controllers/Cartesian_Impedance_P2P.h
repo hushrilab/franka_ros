@@ -47,7 +47,8 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   
   double mytime = 0;
   int freq_counter = 0;
-  bool flag = false;
+  bool skipFirstRun = true;
+  int GripperTask = 1;
   
   // Errors
   Eigen::Matrix<double, 6, 1> error;
