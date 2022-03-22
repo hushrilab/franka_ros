@@ -181,49 +181,50 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         angles_d_target   <<   0,    0,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
         
-        if(GripperTask == 1) { // home Gripper
+        //if(GripperTask == 1) { // home Gripper
             GripperMove(0.01, 0.03, freq_counter);
-        }
+      //  }
     }
     else if(waypoint == 2) {
-        position_d_target << 0.4, 0, 0.1;
+        position_d_target << 0.4, 0, 0.02;
         angles_d_target   <<   0,   0,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
         
-        if(GripperTask == 2) { // open Gripper
+       // if(GripperTask == 2) { // open Gripper
             GripperMove(0.06, 0.03, freq_counter);
-        }
+      //  }
     }  
     else if(waypoint == 3) { // Grasp object here
-        position_d_target << 0.4, 0, 0.1;
+        position_d_target << 0.4, 0, 0.02;
         angles_d_target   <<   0,  0,   0;
-        P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
+        P2PMovement(position_d_target, angles_d_target, position_init, mytime, 2);
         
-        if(GripperTask == 3) { // Grasp object
-            GripperGrasp(0.03, 0.03, 20, 0.005, 5, freq_counter);
-        }
+if(flag) {
+            GripperGrasp(0.035, 0.03, 60, 0.05, 5, freq_counter);
+		std::cout << "Executed" <<std::endl;
+		flag = false;
+	 }
     } 
     else if(waypoint == 4) { // Hold object while moving
-        position_d_target << 0.4, -0.2, 0.5;
+        position_d_target << 0.4, 0, 0.5;
         angles_d_target   <<   0,  0,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
         
-        if(GripperTask == 3) { // Grasp object
-            GripperGrasp(0.03, 0.03, 20, 0.005, 5, freq_counter);
-        }
+	
     } 
     else if(waypoint == 5) { // Drop object
-        position_d_target << 0.4, -0.2, 0.5;
+        position_d_target << 0.4, 0, 0.5;
         angles_d_target   <<   0,  0,   0;
-        P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
+        P2PMovement(position_d_target, angles_d_target, position_init, mytime, 2);
         
-        if(GripperTask == 4) { // open Gripper
+     //   if(GripperTask == 4) { // open Gripper
             GripperMove(0.06, 0.03, freq_counter);
-        }
+      //  }
     }
     else if(waypoint == 6) { // Repeat motion
         waypoint = 1;
         GripperTask = 1;
+	flag = true;
     }
         
 //     else if(waypoint == 4) { // to get steady pose at final waypoint
@@ -316,7 +317,7 @@ void CartesianImpedanceP2P::P2PMovement(const Eigen::Vector3d& target_position, 
     
     orientation_d_target =    Eigen::AngleAxisd(target_angles(0) * M_PI/180 +   M_PI, Eigen::Vector3d::UnitX())
                             * Eigen::AngleAxisd(target_angles(1) * M_PI/180         , Eigen::Vector3d::UnitY())
-                            * Eigen::AngleAxisd(target_angles(2) * M_PI/180 + M_PI/4, Eigen::Vector3d::UnitZ()); 
+                            * Eigen::AngleAxisd(target_angles(2) * M_PI/180, Eigen::Vector3d::UnitZ()); 
     omega_d.setZero();
     domega_d.setZero();
     
@@ -362,7 +363,7 @@ void CartesianImpedanceP2P::GripperMove(double width, double speed, int & freq_c
     
     freq_counter++;
 
-    if (freq_counter >= 50) {     // panda gripper only has a 10 Hz control rate
+//    if (freq_counter >= 50) {     // panda gripper only has a 10 Hz control rate
         if (!skipFirstRun) {
             if(move.getResult()->success) {              
                 stop.sendGoal(franka_gripper::StopGoal());
@@ -379,24 +380,24 @@ void CartesianImpedanceP2P::GripperMove(double width, double speed, int & freq_c
         move.sendGoal(goal);
         skipFirstRun = false;
         freq_counter = 0;
-    }
+//    }
 }
 
 void CartesianImpedanceP2P::GripperGrasp(double width, double speed, int force, double epsilon, int waypoint_end, int & freq_counter) {
     
     freq_counter++;
 
-    if (freq_counter >= 50) {     // panda gripper only has a 10 Hz control rate
-        if (!skipFirstRun) {
-            if(waypoint == waypoint_end) {              
+  //  if (freq_counter >= 50) {     // panda gripper only has a 10 Hz control rate
+       /* if (!skipFirstRun) {
+             if(waypoint == waypoint_end) {              
                 stop.sendGoal(franka_gripper::StopGoal());
                 std::cout<<"Grasp end"<<std::endl;
                 GripperTask++;
                 skipFirstRun = true;
                 freq_counter = 0;
                 return;
-            }
-        }
+            } 
+        } */
         franka_gripper::GraspGoal goal;
         goal.width = width;
         goal.speed = speed;
@@ -404,9 +405,10 @@ void CartesianImpedanceP2P::GripperGrasp(double width, double speed, int force, 
         goal.epsilon.inner = epsilon;
         goal.epsilon.inner = epsilon;
         grasp.sendGoal(goal);
-        skipFirstRun = false;
+	std::cout<<*grasp.getResult()<<std::endl;
+   //     skipFirstRun = false;
         freq_counter = 0;
-    }
+  //  }
 }
 
 void CartesianImpedanceP2P::GripperHome(int & freq_counter) {

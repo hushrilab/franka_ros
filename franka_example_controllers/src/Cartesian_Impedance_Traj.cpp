@@ -81,8 +81,8 @@ bool CartesianImpedanceTrajectory::init(hardware_interface::RobotHW* robot_hw,
     // Nullspace stiffness and damping
     K_N.setIdentity();
     D_N.setIdentity();
-    K_N << K_N * 25;
-    D_N << D_N /** 0.7*/ * sqrt(K_N(0,0));  
+    K_N << K_N * 15;
+    D_N << D_N * 0.5 * sqrt(K_N(0,0));  
     I.setIdentity();
     
     notFirstRun = false;
@@ -244,7 +244,7 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
         joint_handle[i].setCommand(tau_d(i));
     }
     
-//     std::cout << "Error" <<std::endl<< error * 1000 <<std::endl; 
+    std::cout << "Error" <<std::endl<< error * 1000 <<std::endl; 
 
     // UPDATE VALUES FOR FINITE DIFFERENCES
     jacobian_prev << jacobian;

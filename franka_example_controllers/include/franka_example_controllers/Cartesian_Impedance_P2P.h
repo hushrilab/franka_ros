@@ -51,6 +51,7 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   bool skipFirstRun = true;
   int GripperTask = 1;
   int waypoint = 1;
+ bool flag = true;
   
   // Errors
   Eigen::Matrix<double, 6, 1> error;
