@@ -173,6 +173,8 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
         velocity_d     <<                 ds * (position_d_target - position_init);
         acceleration_d <<                dds * (position_d_target - position_init);  
         orientation_d  =  orientation_d.slerp(10/T * s/1000, orientation_d_target);
+//         q_nullspace    << q_null(0,0), q_null(0,1), q_null(0,2), q_null(0,3), q_null(0,4), q_null(0,5), q_null(0,6);
+        q_nullspace    << 0, 0, 0, -1.57082, 0, 1.57082, 0.7852;
     }
     else {
         // FOLLOW TRAJECTORY FROM MATLAB
@@ -188,7 +190,6 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
             i++;
         } 
     }
-    
     if (i >= X.rows() - 1){    //free nullspace movement, when trajectory finished
         q_nullspace << q;
     } 

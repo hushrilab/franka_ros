@@ -38,20 +38,17 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   void P2PMovement(const Eigen::Vector3d& target_position, const Eigen::Vector3d& target_angles, const Eigen::Vector3d& position_start, double time, double T);
   // Filter
   void Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input,  const Eigen::MatrixXd& input_prev, Eigen::MatrixXd& y);
-  void GripperMove(double width, double speed, int & freq_counter); 
-  void GripperGrasp(double width, double speed, int force, double epsilon, int waypoint_end, int & freq_counter);
-  void GripperHome(int & freq_counter);
+  void GripperMove(double width, double speed); 
+  void GripperGrasp(double width, double speed, int force, double epsilon);
+  void GripperHome();
 
   std::unique_ptr<franka_hw::FrankaStateHandle> state_handle;
   std::unique_ptr<franka_hw::FrankaModelHandle> model_handle;
   std::vector<hardware_interface::JointHandle>  joint_handle;
   
   double mytime = 0;
-  int freq_counter = 0;
-  bool skipFirstRun = true;
-  int GripperTask = 1;
   int waypoint = 1;
- bool flag = true;
+  bool GraspOnlyOnce = true;
   
   // Errors
   Eigen::Matrix<double, 6, 1> error;

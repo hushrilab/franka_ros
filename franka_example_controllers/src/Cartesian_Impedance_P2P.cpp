@@ -180,51 +180,43 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         position_d_target << 0.4, 0, 0.5;
         angles_d_target   <<   0,    0,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
-        
-        //if(GripperTask == 1) { // home Gripper
-            GripperMove(0.01, 0.03, freq_counter);
-      //  }
+        // home Gripper
+        GripperMove(0.01, 0.06);
+//         home.sendGoal(franka_gripper::HomingGoal());
     }
     else if(waypoint == 2) {
         position_d_target << 0.4, 0, 0.02;
         angles_d_target   <<   0,   0,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
-        
-       // if(GripperTask == 2) { // open Gripper
-            GripperMove(0.06, 0.03, freq_counter);
-      //  }
+        // open Gripper
+        GripperMove(0.06, 0.03);
     }  
     else if(waypoint == 3) { // Grasp object here
         position_d_target << 0.4, 0, 0.02;
         angles_d_target   <<   0,  0,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 2);
-        
-if(flag) {
-            GripperGrasp(0.035, 0.03, 60, 0.05, 5, freq_counter);
-		std::cout << "Executed" <<std::endl;
-		flag = false;
-	 }
+        // Grasp
+        if(GraspOnlyOnce) {
+            GripperGrasp(0.035, 0.03, 60, 0.05);
+            std::cout << "Executed" <<std::endl;
+            GraspOnlyOnce = false;
+        }
     } 
     else if(waypoint == 4) { // Hold object while moving
         position_d_target << 0.4, 0, 0.5;
         angles_d_target   <<   0,  0,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
-        
-	
     } 
     else if(waypoint == 5) { // Drop object
         position_d_target << 0.4, 0, 0.5;
         angles_d_target   <<   0,  0,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 2);
-        
-     //   if(GripperTask == 4) { // open Gripper
-            GripperMove(0.06, 0.03, freq_counter);
-      //  }
+        // open Gripper
+        GripperMove(0.05, 0.05);
     }
     else if(waypoint == 6) { // Repeat motion
         waypoint = 1;
-        GripperTask = 1;
-	flag = true;
+        GraspOnlyOnce = true;
     }
         
 //     else if(waypoint == 4) { // to get steady pose at final waypoint
@@ -249,7 +241,7 @@ if(flag) {
 //     std::cout<<move.isServerConnected()<<std::endl;
 
     
-///////////////////////////////////// COMPUTE ERRORS /////////////////////´/////////////////////////////////
+///////////////////////////////////// COMPUTE ERRORS //////////////////////////////////////////////////////
     
     // POSITION ERROR
     error.head(3)  << curr_position - position_d;
@@ -359,78 +351,29 @@ void CartesianImpedanceP2P::Filter(double filter_param, int rows, int cols, cons
     y << (1 - filter_param) * y_prev + filter_param * input;
 }
 
-void CartesianImpedanceP2P::GripperMove(double width, double speed, int & freq_counter) {
+void CartesianImpedanceP2P::GripperMove(double width, double speed) {
     
-    freq_counter++;
-
-//    if (freq_counter >= 50) {     // panda gripper only has a 10 Hz control rate
-        if (!skipFirstRun) {
-            if(move.getResult()->success) {              
-                stop.sendGoal(franka_gripper::StopGoal());
-                std::cout<<"Gripper open"<<std::endl;
-                GripperTask++;
-                skipFirstRun = true;
-                freq_counter = 0;
-                return;
-            }
-        }
-        franka_gripper::MoveGoal goal;
-        goal.width = width;
-        goal.speed = speed;
-        move.sendGoal(goal);
-        skipFirstRun = false;
-        freq_counter = 0;
-//    }
+    franka_gripper::MoveGoal goal;
+    goal.width = width;
+    goal.speed = speed;
+    move.sendGoal(goal);
 }
 
-void CartesianImpedanceP2P::GripperGrasp(double width, double speed, int force, double epsilon, int waypoint_end, int & freq_counter) {
+void CartesianImpedanceP2P::GripperGrasp(double width, double speed, int force, double epsilon) {
     
-    freq_counter++;
-
-  //  if (freq_counter >= 50) {     // panda gripper only has a 10 Hz control rate
-       /* if (!skipFirstRun) {
-             if(waypoint == waypoint_end) {              
-                stop.sendGoal(franka_gripper::StopGoal());
-                std::cout<<"Grasp end"<<std::endl;
-                GripperTask++;
-                skipFirstRun = true;
-                freq_counter = 0;
-                return;
-            } 
-        } */
-        franka_gripper::GraspGoal goal;
-        goal.width = width;
-        goal.speed = speed;
-        goal.force = force;
-        goal.epsilon.inner = epsilon;
-        goal.epsilon.inner = epsilon;
-        grasp.sendGoal(goal);
-	std::cout<<*grasp.getResult()<<std::endl;
-   //     skipFirstRun = false;
-        freq_counter = 0;
-  //  }
+    franka_gripper::GraspGoal goal;
+    goal.width = width;
+    goal.speed = speed;
+    goal.force = force;
+    goal.epsilon.inner = epsilon;
+    goal.epsilon.inner = epsilon;
+    grasp.sendGoal(goal);
+//     std::cout<<*grasp.getResult()<<std::endl;
 }
 
-void CartesianImpedanceP2P::GripperHome(int & freq_counter) {
+void CartesianImpedanceP2P::GripperHome() {
     
-    freq_counter++;
-
-    if (freq_counter >= 50) {     // panda gripper only has a 10 Hz control rate
-        if (!skipFirstRun) {
-            if(home.getResult()->success) {              
-                stop.sendGoal(franka_gripper::StopGoal());
-                std::cout<<"Homed"<<std::endl;
-                GripperTask++;
-                skipFirstRun = true;
-                freq_counter = 0;
-                return;
-            }
-        }
-        home.sendGoal(franka_gripper::HomingGoal());
-        std::cout<<*home.getResult()<<std::endl;
-        skipFirstRun = false;
-        freq_counter = 0;
-    }
+//     std::cout<<*home.getResult()<<std::endl;
 }
 
 }  // namespace franka_example_controllers
