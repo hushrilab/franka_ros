@@ -17,7 +17,6 @@
 #include <ros/time.h>
 #include <Eigen/Dense>
 
-#include <franka_example_controllers/compliance_paramConfig.h>
 #include <franka_hw/franka_model_interface.h>
 #include <franka_hw/franka_state_interface.h>
 
@@ -110,6 +109,8 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   Eigen::Matrix<double, 7, 7> D_N;
   Eigen::Matrix<double, 7, 7> I;
   Eigen::Matrix<double, 7, 1> q_nullspace;
+  Eigen::Matrix<double, 7, 1> q_nullspace_init;
+  Eigen::Matrix<double, 7, 1> q_nullspace_target;
   Eigen::Matrix<double, 7, 7> N;
   Eigen::Matrix<double, 6, 1> F_tau;
   Eigen::Matrix<double, 7, 1> tau_task;

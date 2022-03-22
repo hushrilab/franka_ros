@@ -118,6 +118,7 @@ void CartesianImpedanceTrajectory::starting(const ros::Time& /*time*/) {
     position_d_target    <<  position_init; 
     orientation_d_target =   orientation_init;
     q_nullspace          <<  q_initial;
+    q_nullspace_init     <<  q_initial;
     jacobian_prev        <<  jacobian;
     djacobian.setZero();
 }
@@ -156,25 +157,26 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
     djacobian_filtered << y;
 
 ///////////////////////////////////////////////   FOLLOW TRAJECTORY  /////////////////////////////////////////
- 
-    position_d_target             <<     X(0,0),      X(0,1),      X(0,2);
-    orientation_d_target.coeffs() << Quats(0,1),  Quats(0,2),  Quats(0,3), Quats(0,0);
-                          
-    omega_d.setZero();
-    domega_d.setZero();   
                             
     if (s <= 1) {
+        position_d_target             <<      X(0,0),      X(0,1),      X(0,2);
+        orientation_d_target.coeffs() <<  Quats(0,1),  Quats(0,2),  Quats(0,3),  Quats(0,0);
+        q_nullspace_target            << q_null(0,0), q_null(0,1), q_null(0,2), q_null(0,3), q_null(0,4), q_null(0,5), q_null(0,6);
+    //     q_nullspace_target <<  1.51583, -0.658542, -1.09335,  -1.8028, -0.580905,    1.4807,    2.0372;
+        omega_d.setZero();
+        domega_d.setZero();  
+    
         s =       a3 * pow(mytime, 3) +      a4 * pow(mytime, 4) +      a5 * pow(mytime, 5);
         ds =  3 * a3 * pow(mytime, 2) +  4 * a4 * pow(mytime, 3) +  5 * a5 * pow(mytime, 4);
         dds = 6 * a3 *         mytime + 12 * a4 * pow(mytime, 2) + 20 * a5 * pow(mytime, 3); 
 
         // Slowly move to start of trajectory
-        position_d     <<  position_init + s * (position_d_target - position_init);
-        velocity_d     <<                 ds * (position_d_target - position_init);
-        acceleration_d <<                dds * (position_d_target - position_init);  
+        position_d     <<    position_init + s * (position_d_target - position_init);
+        velocity_d     <<                   ds * (position_d_target - position_init);
+        acceleration_d <<                  dds * (position_d_target - position_init);  
         orientation_d  =  orientation_d.slerp(10/T * s/1000, orientation_d_target);
-//         q_nullspace    << q_null(0,0), q_null(0,1), q_null(0,2), q_null(0,3), q_null(0,4), q_null(0,5), q_null(0,6);
-        q_nullspace    << 0, 0, 0, -1.57082, 0, 1.57082, 0.7852;
+        q_nullspace    << q_nullspace_init + s * (q_nullspace_target - q_nullspace_init);
+        // or make D_N very high
     }
     else {
         // FOLLOW TRAJECTORY FROM MATLAB
@@ -244,13 +246,30 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
     for (size_t i = 0; i < 7; ++i) {
         joint_handle[i].setCommand(tau_d(i));
     }
-    
-    std::cout << "Error" <<std::endl<< error * 1000 <<std::endl; 
 
     // UPDATE VALUES FOR FINITE DIFFERENCES
     jacobian_prev << jacobian;
     Lambda_prev   << Lambda;
-    notFirstRun   =  true;
+    notFirstRun   =  true; 
+    
+    // PRINT ERRORS
+    Eigen::Quaterniond Error_quats;
+    Error_quats.x() = error(3);
+    Error_quats.y() = error(4);
+    Error_quats.z() = error(5);
+    Error_quats.w() = 1 - error(3) - error(4) - error(5);
+    Eigen::Vector3d error_angles;
+    error_angles = Error_quats.toRotationMatrix().eulerAngles(0, 1, 2);
+    for(int j = 0; j < 3;j++){
+        if(error_angles(j) > M_PI/2){
+            error_angles(j) = error_angles(j) - M_PI;
+        }
+        if(error_angles(j) < -M_PI/2){
+            error_angles(j) = error_angles(j) + M_PI;
+        }
+    }
+//     std::cout << "Position Error in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl; 
+//    std::cout << "ORIENTATION Error in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl;
 }
 
 Eigen::Matrix<double, 7, 1> CartesianImpedanceTrajectory::saturateTorqueRate(const Eigen::Matrix<double, 7, 1>& tau_d_calculated,

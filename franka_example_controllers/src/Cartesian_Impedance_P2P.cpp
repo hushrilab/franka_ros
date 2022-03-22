@@ -292,13 +292,30 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     for (size_t i = 0; i < 7; ++i) {
         joint_handle[i].setCommand(tau_d(i));
     }
-    
-//     std::cout << "Error" <<std::endl<< error * 1000 <<std::endl; 
 
     // UPDATE VALUES FOR FINITE DIFFERENCES
     jacobian_prev << jacobian;
     Lambda_prev   << Lambda;
     notFirstRun   =  true;
+    
+    // PRINT ERRORS
+    Eigen::Quaterniond Error_quats;
+    Error_quats.x() = error(3);
+    Error_quats.y() = error(4);
+    Error_quats.z() = error(5);
+    Error_quats.w() = 1 - error(3) - error(4) - error(5);
+    Eigen::Vector3d error_angles;
+    error_angles = Error_quats.toRotationMatrix().eulerAngles(0, 1, 2);
+    for(int j = 0; j < 3;j++){
+        if(error_angles(j) > M_PI/2){
+            error_angles(j) = error_angles(j) - M_PI;
+        }
+        if(error_angles(j) < -M_PI/2){
+            error_angles(j) = error_angles(j) + M_PI;
+        }
+    }
+//     std::cout << "Position Error in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl; 
+//    std::cout << "ORIENTATION Error in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl;
 }
 
 void CartesianImpedanceP2P::P2PMovement(const Eigen::Vector3d& target_position, const Eigen::Vector3d& target_angles, const Eigen::Vector3d& position_start, double time, double T){
