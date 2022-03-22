@@ -38,8 +38,8 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   
   // Filter
   void Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input,  const Eigen::MatrixXd& input_prev, Eigen::MatrixXd& y);
-  
   void GripperMove(double width, double speed, int & freq_counter); 
+  void GripperGrasp(double width, double speed, int force, double epsilon, double mytime_end, double mytime_curr, int & freq_counter);
 
   std::unique_ptr<franka_hw::FrankaStateHandle> state_handle;
   std::unique_ptr<franka_hw::FrankaModelHandle> model_handle;
