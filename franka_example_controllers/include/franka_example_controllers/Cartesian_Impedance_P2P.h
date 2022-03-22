@@ -35,11 +35,12 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   Eigen::Matrix<double, 7, 1> saturateTorqueRate(
       const Eigen::Matrix<double, 7, 1>& tau_d_calculated,
       const Eigen::Matrix<double, 7, 1>& tau_J_d);
-  
+  void P2PMovement(const Eigen::Vector3d& target_position, const Eigen::Vector3d& target_angles, const Eigen::Vector3d& position_start, double time, double T);
   // Filter
   void Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input,  const Eigen::MatrixXd& input_prev, Eigen::MatrixXd& y);
   void GripperMove(double width, double speed, int & freq_counter); 
-  void GripperGrasp(double width, double speed, int force, double epsilon, double mytime_end, double mytime_curr, int & freq_counter);
+  void GripperGrasp(double width, double speed, int force, double epsilon, int waypoint_end, int & freq_counter);
+  void GripperHome(int & freq_counter);
 
   std::unique_ptr<franka_hw::FrankaStateHandle> state_handle;
   std::unique_ptr<franka_hw::FrankaModelHandle> model_handle;
@@ -49,6 +50,7 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   int freq_counter = 0;
   bool skipFirstRun = true;
   int GripperTask = 1;
+  int waypoint = 1;
   
   // Errors
   Eigen::Matrix<double, 6, 1> error;
@@ -96,6 +98,7 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   Eigen::Quaterniond curr_orientation;
   Eigen::Vector3d    position_d;
   Eigen::Vector3d    position_d_target;
+  Eigen::Vector3d    position_d_target_old;
   Eigen::Vector3d    position_init;
   Eigen::Vector3d    angles_d_target;
   Eigen::Vector3d    velocity_d;
