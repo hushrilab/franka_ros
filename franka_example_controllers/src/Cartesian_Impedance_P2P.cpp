@@ -12,7 +12,8 @@
 #include <franka_gripper/StopAction.h>
 #include <franka_gripper/HomingAction.h>
 #include <franka/gripper_state.h>
-#include <franka/gripper.h>
+#include <thread>
+#include <ros/node_handle.h>
 
 namespace franka_example_controllers {
 
@@ -90,7 +91,7 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     
     //   For Impedance Controller
     K_p.diagonal() << 700, 700, 700, 40, 40, 15;
-    K_d.diagonal() << 40, 40, 40, 0.7, 0.7, 0.4;
+    K_d.diagonal() << 40, 40, 40, 0.5, 0.5, 0.2;
     
     C_hat.setZero();
     
@@ -178,26 +179,27 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     
     if(waypoint == 1) {
         position_d_target << 0.4, 0, 0.5;
-        angles_d_target   <<   0,    0,   0;
+        angles_d_target   <<   0,    20,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
         // home Gripper
         GripperMove(0.01, 0.06);
-//         home.sendGoal(franka_gripper::HomingGoal());
+        // home.sendGoal(franka_gripper::HomingGoal());
     }
     else if(waypoint == 2) {
-        position_d_target << 0.4, 0, 0.02;
+        position_d_target << 0.4, 0, 0.1;
         angles_d_target   <<   0,   0,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
         // open Gripper
         GripperMove(0.06, 0.03);
     }  
     else if(waypoint == 3) { // Grasp object here
-        position_d_target << 0.4, 0, 0.02;
+        position_d_target << 0.4, 0, 0.1;
         angles_d_target   <<   0,  0,   0;
-        P2PMovement(position_d_target, angles_d_target, position_init, mytime, 2);
+        P2PMovement(position_d_target, angles_d_target, position_init, mytime, 4);
         // Grasp
         if(GraspOnlyOnce) {
-            GripperGrasp(0.035, 0.03, 60, 0.05);
+	    //stop.sendGoal(franka_gripper::StopGoal());
+            GripperGrasp(0.035, 0.03, 20, 0.4);
             std::cout << "Executed" <<std::endl;
             GraspOnlyOnce = false;
         }
@@ -217,19 +219,20 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     else if(waypoint == 6) { // Repeat motion
         waypoint = 1;
         GraspOnlyOnce = true;
-    }
-        
-//     else if(waypoint == 4) { // to get steady pose at final waypoint
-//         position_d     << position_d_target;
-//         velocity_d.setZero();
-//         acceleration_d.setZero();
-//         
-//         orientation_d_target =    Eigen::AngleAxisd(angles_d_target(0) * M_PI/180 +   M_PI, Eigen::Vector3d::UnitX())
-//                                 * Eigen::AngleAxisd(angles_d_target(1) * M_PI/180         , Eigen::Vector3d::UnitY())
-//                                 * Eigen::AngleAxisd(angles_d_target(2) * M_PI/180 + M_PI/4, Eigen::Vector3d::UnitZ()); 
-// 
-//         orientation_d  = orientation_d.slerp(0.01, orientation_d_target);
-//     }
+    } 
+/*        
+     else if(waypoint == 2) { // to get steady pose at final waypoint
+         position_d     << position_d_target;
+         velocity_d.setZero();
+         acceleration_d.setZero();
+         
+         orientation_d_target =    Eigen::AngleAxisd(angles_d_target(0) * M_PI/180 +   M_PI, Eigen::Vector3d::UnitX())
+                                 * Eigen::AngleAxisd(angles_d_target(1) * M_PI/180         , Eigen::Vector3d::UnitY())
+                                 * Eigen::AngleAxisd(angles_d_target(2) * M_PI/180         , Eigen::Vector3d::UnitZ()); 
+ 
+         orientation_d  = orientation_d.slerp(0.01, orientation_d_target);
+     }
+*/
     else {
         position_d     << curr_position;
         velocity_d.setZero();
@@ -238,7 +241,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         ROS_ERROR_STREAM("CartesianImpedanceP2P: No waypoint defined!");
     }
     
-//     std::cout<<move.isServerConnected()<<std::endl;
+ //    std::cout<<move.isServerConnected()<<std::endl;
 
     
 ///////////////////////////////////// COMPUTE ERRORS //////////////////////////////////////////////////////
@@ -314,8 +317,9 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
             error_angles(j) = error_angles(j) + M_PI;
         }
     }
-//     std::cout << "Position Error in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl; 
-//    std::cout << "ORIENTATION Error in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl;
+
+  //  std::cout << "Position Error in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl; 
+ //   std::cout << "ORIENTATION Error in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl;
 }
 
 void CartesianImpedanceP2P::P2PMovement(const Eigen::Vector3d& target_position, const Eigen::Vector3d& target_angles, const Eigen::Vector3d& position_start, double time, double T){
@@ -326,7 +330,7 @@ void CartesianImpedanceP2P::P2PMovement(const Eigen::Vector3d& target_position, 
     
     orientation_d_target =    Eigen::AngleAxisd(target_angles(0) * M_PI/180 +   M_PI, Eigen::Vector3d::UnitX())
                             * Eigen::AngleAxisd(target_angles(1) * M_PI/180         , Eigen::Vector3d::UnitY())
-                            * Eigen::AngleAxisd(target_angles(2) * M_PI/180, Eigen::Vector3d::UnitZ()); 
+                            * Eigen::AngleAxisd(target_angles(2) * M_PI/180         , Eigen::Vector3d::UnitZ()); 
     omega_d.setZero();
     domega_d.setZero();
     
@@ -385,7 +389,6 @@ void CartesianImpedanceP2P::GripperGrasp(double width, double speed, int force, 
     goal.epsilon.inner = epsilon;
     goal.epsilon.inner = epsilon;
     grasp.sendGoal(goal);
-//     std::cout<<*grasp.getResult()<<std::endl;
 }
 
 void CartesianImpedanceP2P::GripperHome() {
