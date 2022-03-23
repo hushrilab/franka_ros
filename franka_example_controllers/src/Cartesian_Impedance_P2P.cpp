@@ -139,10 +139,10 @@ void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
 
   ///////////////////////////// Gripper /////////////////////////////////
  
-  actionlib::SimpleActionClient<franka_gripper::MoveAction>   move( "franka_gripper/move", true);
-  actionlib::SimpleActionClient<franka_gripper::GraspAction> grasp("franka_gripper/grasp", true);
-  actionlib::SimpleActionClient<franka_gripper::StopAction>   stop( "franka_gripper/stop", true);
-  actionlib::SimpleActionClient<franka_gripper::HomingAction> home( "franka_gripper/home", true);
+    actionlib::SimpleActionClient<franka_gripper::MoveAction>   move( "franka_gripper/move", true);
+    actionlib::SimpleActionClient<franka_gripper::GraspAction> grasp("franka_gripper/grasp", true);
+    actionlib::SimpleActionClient<franka_gripper::StopAction>   stop( "franka_gripper/stop", true);
+    actionlib::SimpleActionClient<franka_gripper::HomingAction> home( "franka_gripper/home", true);
     
 void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duration& period) {
     
@@ -184,7 +184,10 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         angles_d_target   <<   0,    20,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
         // home Gripper
-        GripperMove(0.01, 0.06);
+        if(SendOnlyOnce1) {
+            GripperMove(0.01, 0.06);
+            SendOnlyOnce1 = false;
+        }
         // home.sendGoal(franka_gripper::HomingGoal());
     }
     else if(waypoint == 2) {
@@ -192,7 +195,10 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         angles_d_target   <<   0,   0,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
         // open Gripper
-        GripperMove(0.06, 0.03);
+        if(SendOnlyOnce2) {
+           GripperMove(0.06, 0.03);
+           SendOnlyOnce2 = false;
+        }
     }  
     else if(waypoint == 3) { // Grasp object here
         position_d_target << 0.4, 0, 0.1;
@@ -200,7 +206,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 4);
         // Grasp
         if(GraspOnlyOnce) {
-	    stop.sendGoal(franka_gripper::StopGoal());
+//             stop.sendGoal(franka_gripper::StopGoal());
             GripperGrasp(0.035, 0.03, 30, 0.05);
             std::cout << "Executed" <<std::endl;
             GraspOnlyOnce = false;
@@ -216,12 +222,18 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         angles_d_target   <<   0,  0,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 2);
         // open Gripper
-        GripperMove(0.05, 0.05);
+        if(SendOnlyOnce3) {
+           GripperMove(0.06, 0.03);
+           SendOnlyOnce3 = false;
+        }
     }
     else if(waypoint == 6) { // Repeat motion
-	stop.sendGoal(franka_gripper::StopGoal());
+// 	stop.sendGoal(franka_gripper::StopGoal());
         waypoint = 1;
         GraspOnlyOnce = true;
+        SendOnlyOnce1 = true;
+        SendOnlyOnce2 = true;
+        SendOnlyOnce3 = true;
     } 
 /*        
      else if(waypoint == 2) { // to get steady pose at final waypoint
@@ -243,8 +255,6 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         orientation_d  = curr_orientation;
         ROS_ERROR_STREAM("CartesianImpedanceP2P: No waypoint defined!");
     }
-
-    
 ///////////////////////////////////// COMPUTE ERRORS //////////////////////////////////////////////////////
     
     // POSITION ERROR
@@ -374,22 +384,23 @@ void CartesianImpedanceP2P::Filter(double filter_param, int rows, int cols, cons
 }
 
 void CartesianImpedanceP2P::GripperMove(double width, double speed) {
-    
-    franka_gripper::MoveGoal goal;
-    goal.width = width;
-    goal.speed = speed;
-    move.sendGoal(goal);
+
+    franka_gripper::MoveGoal  move_goal;
+    move_goal.width = width;
+    move_goal.speed = speed;
+    move.sendGoal(move_goal);
+    std::cout<<"Move Goal send"<<std::endl;
 }
 
 void CartesianImpedanceP2P::GripperGrasp(double width, double speed, int force, double epsilon) {
     
-    franka_gripper::GraspGoal goal2;
-    goal2.width = width;
-    goal2.speed = speed;
-    goal2.force = force;
-    goal2.epsilon.inner = epsilon;
-    goal2.epsilon.outer = epsilon;
-    grasp.sendGoal(goal2);
+    franka_gripper::GraspGoal grasp_goal;
+    grasp_goal.width = width;
+    grasp_goal.speed = speed;
+    grasp_goal.force = force;
+    grasp_goal.epsilon.inner = epsilon;
+    grasp_goal.epsilon.outer = epsilon;
+    grasp.sendGoal(grasp_goal);
 }
 
 void CartesianImpedanceP2P::GripperHome() {

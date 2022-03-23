@@ -49,6 +49,9 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   double mytime = 0;
   int waypoint = 1;
   bool GraspOnlyOnce = true;
+  bool SendOnlyOnce1 = true;
+  bool SendOnlyOnce2 = true;
+  bool SendOnlyOnce3 = true;
   
   // Errors
   Eigen::Matrix<double, 6, 1> error;
