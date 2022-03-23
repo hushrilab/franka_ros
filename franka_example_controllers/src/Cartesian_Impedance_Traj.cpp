@@ -73,8 +73,8 @@ bool CartesianImpedanceTrajectory::init(hardware_interface::RobotHW* robot_hw,
     dderror.setZero();
     
     //   For Impedance Controller
-    K_p.diagonal() << 700, 700, 700,  40,  40,  15;
-    K_d.diagonal() <<  40,  40,  40, 0.5, 0.5, 0.2;
+    K_p.diagonal() << 700, 700, 700,  40,  60,  15;
+    K_d.diagonal() <<  40,  40,  40, 0.5, 1.0, 0.2;
     
     C_hat.setZero();
     
@@ -268,8 +268,8 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
             error_angles(j) = error_angles(j) + M_PI;
         }
     }
-     std::cout << "[POSITION ERROR in [mm]]:" <<std::endl<< error.head(3) * 1000 <<std::endl; 
- //   std::cout << "[ORIENTATION ERROR in [deg]]:" <<std::endl<< error_angles * 180/M_PI<<std::endl;
+   // std::cout << "POSITION ERROR in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl; 
+    std::cout << "ORIENTATION ERROR in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl;
 }
 
 Eigen::Matrix<double, 7, 1> CartesianImpedanceTrajectory::saturateTorqueRate(const Eigen::Matrix<double, 7, 1>& tau_d_calculated,

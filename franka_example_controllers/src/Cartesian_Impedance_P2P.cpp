@@ -12,8 +12,10 @@
 #include <franka_gripper/StopAction.h>
 #include <franka_gripper/HomingAction.h>
 #include <franka/gripper_state.h>
-#include <thread>
+#include <franka/gripper.h>
+#include <franka/exception.h>
 #include <ros/node_handle.h>
+#include <thread>
 
 namespace franka_example_controllers {
 
@@ -90,8 +92,8 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     dderror.setZero();
     
     //   For Impedance Controller
-    K_p.diagonal() << 700, 700, 700, 40, 40, 15;
-    K_d.diagonal() << 40, 40, 40, 0.5, 0.5, 0.2;
+    K_p.diagonal() << 700, 700, 700,  40,  60,  15;
+    K_d.diagonal() <<  40,  40,  40, 0.5, 1.0, 0.2;
     
     C_hat.setZero();
     
@@ -198,8 +200,8 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 4);
         // Grasp
         if(GraspOnlyOnce) {
-	    //stop.sendGoal(franka_gripper::StopGoal());
-            GripperGrasp(0.035, 0.03, 20, 0.4);
+	    stop.sendGoal(franka_gripper::StopGoal());
+            GripperGrasp(0.035, 0.03, 30, 0.05);
             std::cout << "Executed" <<std::endl;
             GraspOnlyOnce = false;
         }
@@ -217,6 +219,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         GripperMove(0.05, 0.05);
     }
     else if(waypoint == 6) { // Repeat motion
+	stop.sendGoal(franka_gripper::StopGoal());
         waypoint = 1;
         GraspOnlyOnce = true;
     } 
@@ -240,8 +243,6 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         orientation_d  = curr_orientation;
         ROS_ERROR_STREAM("CartesianImpedanceP2P: No waypoint defined!");
     }
-    
- //    std::cout<<move.isServerConnected()<<std::endl;
 
     
 ///////////////////////////////////// COMPUTE ERRORS //////////////////////////////////////////////////////
@@ -319,7 +320,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     }
 
   //  std::cout << "Position Error in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl; 
- //   std::cout << "ORIENTATION Error in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl;
+  //  std::cout << "ORIENTATION Error in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl;
 }
 
 void CartesianImpedanceP2P::P2PMovement(const Eigen::Vector3d& target_position, const Eigen::Vector3d& target_angles, const Eigen::Vector3d& position_start, double time, double T){
@@ -382,13 +383,13 @@ void CartesianImpedanceP2P::GripperMove(double width, double speed) {
 
 void CartesianImpedanceP2P::GripperGrasp(double width, double speed, int force, double epsilon) {
     
-    franka_gripper::GraspGoal goal;
-    goal.width = width;
-    goal.speed = speed;
-    goal.force = force;
-    goal.epsilon.inner = epsilon;
-    goal.epsilon.inner = epsilon;
-    grasp.sendGoal(goal);
+    franka_gripper::GraspGoal goal2;
+    goal2.width = width;
+    goal2.speed = speed;
+    goal2.force = force;
+    goal2.epsilon.inner = epsilon;
+    goal2.epsilon.outer = epsilon;
+    grasp.sendGoal(goal2);
 }
 
 void CartesianImpedanceP2P::GripperHome() {
