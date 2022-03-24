@@ -11,11 +11,6 @@
 #include <franka_gripper/MoveAction.h>
 #include <franka_gripper/StopAction.h>
 #include <franka_gripper/HomingAction.h>
-#include <franka/gripper_state.h>
-#include <franka/gripper.h>
-#include <franka/exception.h>
-#include <ros/node_handle.h>
-#include <thread>
 
 namespace franka_example_controllers {
 
@@ -108,6 +103,13 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     return true;
 }
 
+//////////////////////////////////////////// Gripper //////////////////////////////////////////////
+ 
+    actionlib::SimpleActionClient<franka_gripper::MoveAction>   move( "franka_gripper/move", true);
+    actionlib::SimpleActionClient<franka_gripper::GraspAction> grasp("franka_gripper/grasp", true);
+    actionlib::SimpleActionClient<franka_gripper::StopAction>   stop( "franka_gripper/stop", true);
+    actionlib::SimpleActionClient<franka_gripper::HomingAction> home( "franka_gripper/home", true);
+
 void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
 
     franka::RobotState initial_state = state_handle->getRobotState();
@@ -130,13 +132,6 @@ void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
     jacobian_prev        <<  jacobian;
     djacobian.setZero();
 }
-
-  ///////////////////////////// Gripper /////////////////////////////////
- 
-    actionlib::SimpleActionClient<franka_gripper::MoveAction>   move( "franka_gripper/move", true);
-    actionlib::SimpleActionClient<franka_gripper::GraspAction> grasp("franka_gripper/grasp", true);
-    actionlib::SimpleActionClient<franka_gripper::StopAction>   stop( "franka_gripper/stop", true);
-    actionlib::SimpleActionClient<franka_gripper::HomingAction> home( "franka_gripper/home", true);
     
 void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duration& period) {
     
@@ -192,7 +187,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
            GripperMove(0.06, 0.03);
         }
     }  
-    else if(waypoint == 3) { // Grasp object here
+/*    else if(waypoint == 3) { // Grasp object here
         position_d_target << 0.4, 0, 0.03;
         angles_d_target   <<   0, 0,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 1);
@@ -225,8 +220,9 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         waypoint    = 1;
         GripperTask = 1;
     } 
-/*        
-     else if(waypoint == 2) { // to get steady pose at final waypoint
+*/   
+// /*
+     else if(waypoint == 3) { // to get steady pose at final waypoint
          position_d     << position_d_target;
          velocity_d.setZero();
          acceleration_d.setZero();
@@ -237,7 +233,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
  
          orientation_d  = orientation_d.slerp(0.01, orientation_d_target);
      }
-*/
+//*/
     else {
         position_d     << curr_position;
         velocity_d.setZero();
@@ -310,6 +306,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     Error_quats.w() = 1 - error(3) - error(4) - error(5);
     Eigen::Vector3d error_angles;
     error_angles = Error_quats.toRotationMatrix().eulerAngles(0, 1, 2);
+    
     for(int j = 0; j < 3;j++){
         if(error_angles(j) > M_PI/2){
             error_angles(j) = error_angles(j) - M_PI;
@@ -393,6 +390,7 @@ void CartesianImpedanceP2P::GripperGrasp(double width, double speed, int force, 
     grasp.sendGoal(grasp_goal);
     GripperTask++;
 }
+
 }  // namespace franka_example_controllers
 
 PLUGINLIB_EXPORT_CLASS(franka_example_controllers::CartesianImpedanceP2P,

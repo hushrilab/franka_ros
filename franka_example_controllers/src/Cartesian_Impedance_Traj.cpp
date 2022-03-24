@@ -6,6 +6,12 @@
 #include <pluginlib/class_list_macros.h>
 #include <ros/ros.h>
 
+#include <actionlib/client/simple_action_client.h>
+#include <franka_gripper/GraspAction.h>
+#include <franka_gripper/MoveAction.h>
+#include <franka_gripper/StopAction.h>
+#include <franka_gripper/HomingAction.h>
+
 namespace franka_example_controllers {
 
 bool CartesianImpedanceTrajectory::init(hardware_interface::RobotHW* robot_hw,
@@ -99,6 +105,13 @@ bool CartesianImpedanceTrajectory::init(hardware_interface::RobotHW* robot_hw,
     return true;
 }
 
+//////////////////////////////////////////// Gripper //////////////////////////////////////////////
+ 
+    actionlib::SimpleActionClient<franka_gripper::MoveAction>   move1( "franka_gripper/move", true);
+    actionlib::SimpleActionClient<franka_gripper::GraspAction> grasp1("franka_gripper/grasp", true);
+    actionlib::SimpleActionClient<franka_gripper::StopAction>   stop1( "franka_gripper/stop", true);
+    actionlib::SimpleActionClient<franka_gripper::HomingAction> home1( "franka_gripper/home", true);
+
 void CartesianImpedanceTrajectory::starting(const ros::Time& /*time*/) {
 
     franka::RobotState initial_state = state_handle->getRobotState();
@@ -162,7 +175,6 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
         position_d_target             <<      X(0,0),      X(0,1),      X(0,2);
         orientation_d_target.coeffs() <<  Quats(0,1),  Quats(0,2),  Quats(0,3),  Quats(0,0);
         q_nullspace_target            << q_null(0,0), q_null(0,1), q_null(0,2), q_null(0,3), q_null(0,4), q_null(0,5), q_null(0,6);
-    //     q_nullspace_target <<  1.51583, -0.658542, -1.09335,  -1.8028, -0.580905,    1.4807,    2.0372;
         omega_d.setZero();
         domega_d.setZero();  
     
@@ -176,6 +188,7 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
         acceleration_d <<                  dds * (position_d_target - position_init);  
         orientation_d  =  orientation_d.slerp(10/T * s/1000, orientation_d_target);
         q_nullspace    << q_nullspace_init + s * (q_nullspace_target - q_nullspace_init);
+//         D_N << D_N * 5;
         // or make D_N very high
     }
     else {
@@ -195,6 +208,15 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
     if (i >= X.rows() - 1){    //free nullspace movement, when trajectory finished
         q_nullspace << q;
     } 
+    if (i == 1){
+        GripperMove(0.06, 0.03);
+    }
+    if (i == 350){
+        GripperGrasp(0.035, 0.03, 30, 0.005);
+    }
+    if (i == 2500){
+        GripperMove(0.06, 0.03);
+    }
 /////////////////////////////////////////// COMPUTE ERRORS ///////////////////////////////////////////////////
     
     // POSITION ERROR
@@ -260,6 +282,7 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
     Error_quats.w() = 1 - error(3) - error(4) - error(5);
     Eigen::Vector3d error_angles;
     error_angles = Error_quats.toRotationMatrix().eulerAngles(0, 1, 2);
+    
     for(int j = 0; j < 3;j++){
         if(error_angles(j) > M_PI/2){
             error_angles(j) = error_angles(j) - M_PI;
@@ -287,6 +310,27 @@ void CartesianImpedanceTrajectory::Filter(double filter_param, int rows, int col
         
     y.resize(rows,cols);
     y << (1 - filter_param) * y_prev + filter_param * input;
+}
+
+void CartesianImpedanceTrajectory::GripperMove(double width, double speed) {
+
+    franka_gripper::MoveGoal  move_goal;
+    move_goal.width = width;
+    move_goal.speed = speed;
+    move1.sendGoal(move_goal);
+    GripperTask++;
+}
+
+void CartesianImpedanceTrajectory::GripperGrasp(double width, double speed, int force, double epsilon) {
+    
+    franka_gripper::GraspGoal grasp_goal;
+    grasp_goal.width = width;
+    grasp_goal.speed = speed;
+    grasp_goal.force = force;
+    grasp_goal.epsilon.inner = epsilon;
+    grasp_goal.epsilon.outer = epsilon;
+    grasp1.sendGoal(grasp_goal);
+    GripperTask++;
 }
 
 }  // namespace franka_example_controllers

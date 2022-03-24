@@ -39,6 +39,8 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   
   // Filter
   void Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input,  const Eigen::MatrixXd& input_prev, Eigen::MatrixXd& y);
+  void GripperMove(double width, double speed); 
+  void GripperGrasp(double width, double speed, int force, double epsilon);
   
   //  Function to lad csv files; Source: https://stackoverflow.com/questions/34247057/how-to-read-csv-file-and-assign-to-eigen-matrix
   template<typename M> M load_csv (const std::string & path, const std::string & filename) {
@@ -64,8 +66,8 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   
   // Load MATLAB trajectory
 
-  // std::string path = "../rospackages/catkin_ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/";
-     std::string path = "../ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/";
+   std::string path = "../rospackages/catkin_ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/";
+   //  std::string path = "../ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/";
 
   Eigen::MatrixXd X      = load_csv<Eigen::MatrixXd>(path,      "x.csv");
   Eigen::MatrixXd dX     = load_csv<Eigen::MatrixXd>(path,     "dx.csv");
@@ -76,8 +78,10 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   Eigen::MatrixXd q_null = load_csv<Eigen::MatrixXd>(path, "q_null.csv");
   Eigen::MatrixXd ts     = load_csv<Eigen::MatrixXd>(path,     "ts.csv");
   
-  double i = 0;
-  double mytime = 0;
+  double i        = 0;
+  double mytime   = 0;
+  int waypoint    = 1;
+  int GripperTask = 1;
 
   // for quintic trajectory
   double T;
