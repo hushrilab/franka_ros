@@ -40,18 +40,14 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   void Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input,  const Eigen::MatrixXd& input_prev, Eigen::MatrixXd& y);
   void GripperMove(double width, double speed); 
   void GripperGrasp(double width, double speed, int force, double epsilon);
-  void GripperHome();
 
   std::unique_ptr<franka_hw::FrankaStateHandle> state_handle;
   std::unique_ptr<franka_hw::FrankaModelHandle> model_handle;
   std::vector<hardware_interface::JointHandle>  joint_handle;
   
-  double mytime = 0;
-  int waypoint = 1;
-  bool GraspOnlyOnce = true;
-  bool SendOnlyOnce1 = true;
-  bool SendOnlyOnce2 = true;
-  bool SendOnlyOnce3 = true;
+  double mytime   = 0;
+  int waypoint    = 1;
+  int GripperTask = 1;
   
   // Errors
   Eigen::Matrix<double, 6, 1> error;
@@ -89,9 +85,9 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   double a3;
   double a4;
   double a5;
-  double s; 
-  double ds;
-  double dds;
+  double s   = 0; 
+  double ds  = 0; 
+  double dds = 0; 
   
   Eigen::Vector3d    curr_position;
   Eigen::Matrix<double, 6, 1> curr_velocity;
