@@ -188,7 +188,6 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
         acceleration_d <<                  dds * (position_d_target - position_init);  
         orientation_d  =  orientation_d.slerp(10/T * s/1000, orientation_d_target);
         q_nullspace    << q_nullspace_init + s * (q_nullspace_target - q_nullspace_init);
-//         D_N << D_N * 5;
         // or make D_N very high
     }
     else {
@@ -208,13 +207,14 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
     if (i >= X.rows() - 1){    //free nullspace movement, when trajectory finished
         q_nullspace << q;
     } 
-    if (i == 1){
+    if (i == 1 && GripperTask == 1){
         GripperMove(0.06, 0.03);
     }
-    if (i == 350){
+    if (i == 360 && GripperTask == 2){
         GripperGrasp(0.035, 0.03, 30, 0.005);
+std::cout<<"Grasp Executed"<<std::endl;
     }
-    if (i == 2500){
+    if (i == 2500 && GripperTask == 3){
         GripperMove(0.06, 0.03);
     }
 /////////////////////////////////////////// COMPUTE ERRORS ///////////////////////////////////////////////////
@@ -292,7 +292,7 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
         }
     }
    // std::cout << "POSITION ERROR in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl; 
-    std::cout << "ORIENTATION ERROR in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl;
+   // std::cout << "ORIENTATION ERROR in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl;
 }
 
 Eigen::Matrix<double, 7, 1> CartesianImpedanceTrajectory::saturateTorqueRate(const Eigen::Matrix<double, 7, 1>& tau_d_calculated,

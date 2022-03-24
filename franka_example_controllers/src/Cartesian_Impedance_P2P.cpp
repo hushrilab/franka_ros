@@ -187,7 +187,8 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
            GripperMove(0.06, 0.03);
         }
     }  
-/*    else if(waypoint == 3) { // Grasp object here
+// /* 
+    else if(waypoint == 3) { // Grasp object here
         position_d_target << 0.4, 0, 0.03;
         angles_d_target   <<   0, 0,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 1);
@@ -202,12 +203,12 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
     } 
     else if(waypoint == 5) { // Hold object while moving
-        position_d_target << 0.4, 0, 0.03;
+        position_d_target << 0.4, 0, 0.035;
         angles_d_target   <<   0, 0,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
     } 
     else if(waypoint == 6) { // Drop object
-        position_d_target << 0.4, 0, 0.03;
+        position_d_target << 0.4, 0, 0.035;
         angles_d_target   <<   0, 0,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 1);
         // open Gripper
@@ -220,8 +221,8 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         waypoint    = 1;
         GripperTask = 1;
     } 
-*/   
-// /*
+//*/   
+ /*
      else if(waypoint == 3) { // to get steady pose at final waypoint
          position_d     << position_d_target;
          velocity_d.setZero();
@@ -233,7 +234,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
  
          orientation_d  = orientation_d.slerp(0.01, orientation_d_target);
      }
-//*/
+*/
     else {
         position_d     << curr_position;
         velocity_d.setZero();
