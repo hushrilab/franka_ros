@@ -66,8 +66,8 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   
   // Load MATLAB trajectory
 
-   std::string path = "../rospackages/catkin_ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/";
-//      std::string path = "../ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/";
+  // std::string path = "../rospackages/catkin_ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/";
+      std::string path = "../ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/";
 
   Eigen::MatrixXd X       = load_csv<Eigen::MatrixXd>(path,            "x.csv");
   Eigen::MatrixXd dX      = load_csv<Eigen::MatrixXd>(path,           "dx.csv");
@@ -82,8 +82,6 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   double i        = 0;
   double mytime   = 0;
   int waypoint    = 1;
-  int GripperTask = 1;
-  int GripperTask_old = 1;
 
   // for quintic trajectory
   double T;

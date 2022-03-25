@@ -316,7 +316,6 @@ void CartesianImpedanceTrajectory::GripperMove(double width, double speed) {
     move_goal.width = width;
     move_goal.speed = speed;
     move1.sendGoal(move_goal);
-    GripperTask++;
 }
 
 void CartesianImpedanceTrajectory::GripperGrasp(double width, double speed, int force, double epsilon) {
@@ -328,7 +327,6 @@ void CartesianImpedanceTrajectory::GripperGrasp(double width, double speed, int 
     grasp_goal.epsilon.inner = epsilon;
     grasp_goal.epsilon.outer = epsilon;
     grasp1.sendGoal(grasp_goal);
-    GripperTask++;
 }
 
 }  // namespace franka_example_controllers
