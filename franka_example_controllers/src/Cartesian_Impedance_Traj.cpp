@@ -98,9 +98,6 @@ bool CartesianImpedanceTrajectory::init(hardware_interface::RobotHW* robot_hw,
     a3  =   10 / pow(T, 3);
     a4  = - 15 / pow(T, 4);
     a5  =    6 / pow(T, 5);
-    s   =    0;
-    ds  =    0;
-    dds =    0;
 
     return true;
 }
@@ -192,31 +189,32 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
     }
     else {
         // FOLLOW TRAJECTORY FROM MATLAB
-        position_d             <<      X(i,0),      X(i,1),      X(i,2);  //X.row(i) does not work
-        velocity_d             <<     dX(i,0),     dX(i,1),     dX(i,2);
-        acceleration_d         <<    ddX(i,0),    ddX(i,1),    ddX(i,2);
-        orientation_d.coeffs() <<  Quats(i,1),  Quats(i,2),  Quats(i,3), Quats(i,0);
-        omega_d                <<  omega(i,0),  omega(i,1),  omega(i,2);
-        domega_d               << domega(i,0), domega(i,1), domega(i,2);
-        q_nullspace            << q_null(i,0), q_null(i,1), q_null(i,2), q_null(i,3), q_null(i,4), q_null(i,5), q_null(i,6); 
-    
+        position_d             <<       X(i,0),       X(i,1),       X(i,2);  //X.row(i) does not work
+        velocity_d             <<      dX(i,0),      dX(i,1),      dX(i,2);
+        acceleration_d         <<     ddX(i,0),     ddX(i,1),     ddX(i,2);
+        orientation_d.coeffs() <<   Quats(i,1),   Quats(i,2),   Quats(i,3),  Quats(i,0);
+        omega_d                <<   omega(i,0),   omega(i,1),   omega(i,2);
+        domega_d               <<  domega(i,0),  domega(i,1),  domega(i,2);
+        q_nullspace            <<  q_null(i,0),  q_null(i,1),  q_null(i,2),  q_null(i,3),  q_null(i,4),  q_null(i,5),  q_null(i,6); 
+        gripper_command        << gripper(i,0), gripper(i,1), gripper(i,2), gripper(i,3), gripper(i,4);
+        
         if (mytime >= i * ts(0,0) + T && mytime >= ts(0,0) + T && i < X.rows() - 1) {
             i++;
+            
+            if (gripper_command(0) == 1){
+                GripperMove(gripper_command(1), gripper_command(2));
+                std::cout<<"Move command"<<std::endl;
+            }
+            if (gripper_command(0) == 2){
+                GripperGrasp(gripper_command(1), gripper_command(2), gripper_command(3),gripper_command(4));
+                std::cout<<"Grasp command"<<std::endl;
+            }
         } 
     }
     if (i >= X.rows() - 1){    //free nullspace movement, when trajectory finished
         q_nullspace << q;
     } 
-    if (i == 1 && GripperTask == 1){
-        GripperMove(0.06, 0.03);
-    }
-    if (i == 360 && GripperTask == 2){
-        GripperGrasp(0.035, 0.03, 30, 0.005);
-std::cout<<"Grasp Executed"<<std::endl;
-    }
-    if (i == 2500 && GripperTask == 3){
-        GripperMove(0.06, 0.03);
-    }
+
 /////////////////////////////////////////// COMPUTE ERRORS ///////////////////////////////////////////////////
     
     // POSITION ERROR

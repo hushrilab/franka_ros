@@ -66,31 +66,33 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   
   // Load MATLAB trajectory
 
- //  std::string path = "../rospackages/catkin_ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/";
-     std::string path = "../ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/";
+   std::string path = "../rospackages/catkin_ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/";
+//      std::string path = "../ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/";
 
-  Eigen::MatrixXd X      = load_csv<Eigen::MatrixXd>(path,      "x.csv");
-  Eigen::MatrixXd dX     = load_csv<Eigen::MatrixXd>(path,     "dx.csv");
-  Eigen::MatrixXd ddX    = load_csv<Eigen::MatrixXd>(path,    "ddx.csv");
-  Eigen::MatrixXd Quats  = load_csv<Eigen::MatrixXd>(path,  "quats.csv");
-  Eigen::MatrixXd omega  = load_csv<Eigen::MatrixXd>(path,  "omega.csv");
-  Eigen::MatrixXd domega = load_csv<Eigen::MatrixXd>(path, "domega.csv");
-  Eigen::MatrixXd q_null = load_csv<Eigen::MatrixXd>(path, "q_null.csv");
-  Eigen::MatrixXd ts     = load_csv<Eigen::MatrixXd>(path,     "ts.csv");
+  Eigen::MatrixXd X       = load_csv<Eigen::MatrixXd>(path,            "x.csv");
+  Eigen::MatrixXd dX      = load_csv<Eigen::MatrixXd>(path,           "dx.csv");
+  Eigen::MatrixXd ddX     = load_csv<Eigen::MatrixXd>(path,          "ddx.csv");
+  Eigen::MatrixXd Quats   = load_csv<Eigen::MatrixXd>(path,        "quats.csv");
+  Eigen::MatrixXd omega   = load_csv<Eigen::MatrixXd>(path,        "omega.csv");
+  Eigen::MatrixXd domega  = load_csv<Eigen::MatrixXd>(path,       "domega.csv");
+  Eigen::MatrixXd q_null  = load_csv<Eigen::MatrixXd>(path,       "q_null.csv");
+  Eigen::MatrixXd ts      = load_csv<Eigen::MatrixXd>(path,           "ts.csv");
+  Eigen::MatrixXd gripper = load_csv<Eigen::MatrixXd>(path, "gripperTasks.csv");
   
   double i        = 0;
   double mytime   = 0;
   int waypoint    = 1;
   int GripperTask = 1;
+  int GripperTask_old = 1;
 
   // for quintic trajectory
   double T;
   double a3;
   double a4;
   double a5;
-  double s; 
-  double ds;
-  double dds;
+  double s   = 0; 
+  double ds  = 0;
+  double dds = 0;
   
   // Errors
   Eigen::Matrix<double, 6, 1> error;
@@ -124,6 +126,7 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   Eigen::Matrix<double, 6, 7> djacobian_filtered;
   Eigen::Matrix<double, 6, 7> jacobian_prev;
   Eigen::Matrix<double, 7, 1> tau_d_saturated;
+  Eigen::Matrix<double, 5, 1> gripper_command;
   
   Eigen::Vector3d    curr_position;
   Eigen::Matrix<double, 6, 1> curr_velocity;
