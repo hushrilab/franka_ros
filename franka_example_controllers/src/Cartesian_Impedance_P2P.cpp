@@ -87,8 +87,20 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     dderror.setZero();
     
     //   For Impedance Controller
-    K_p.diagonal() << 700, 700, 700,  40,  60,  15;
-    K_d.diagonal() <<  40,  40,  40, 0.5, 1.0, 0.2;
+    K_p.diagonal() << 500, 500, 600,  40,  60,  12;
+    K_d.diagonal() <<  25,  25,  30, 1.5, 1.5, 0.1;
+
+// Soft Position, stiff orientation
+  //  K_p.diagonal() << 300, 300, 300,  140,  160,  115;
+  //  K_d.diagonal() <<  20,  20,  20, 10.5, 10.0, 10.2;
+
+// Stiff Position, soft orientation
+ //   K_p.diagonal() << 1500, 1500, 1500,  20,  20,  5;
+ //  K_d.diagonal() <<  80,  80,  80, 0.5, 0.5, 0.2;
+
+// Stiff z-axis
+//    K_p.diagonal() << 400, 400, 1700,  40,  60,  12;
+ //   K_d.diagonal() <<  10,  10,  80, 0.5, 1.0, 0.05;
     
     C_hat.setZero();
     
@@ -96,7 +108,7 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     K_N.setIdentity();
     D_N.setIdentity();
     K_N << K_N * 25;
-    D_N << D_N * 0.5 * sqrt(K_N(0,0));  
+    D_N << D_N * sqrt(K_N(0,0));  
     I.setIdentity();
     
     notFirstRun = false;
@@ -317,8 +329,8 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         }
     }
 
-  //  std::cout << "Position Error in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl; 
-  //  std::cout << "ORIENTATION Error in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl;
+    std::cout << "Position Error in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl<<std::endl; 
+    std::cout << "ORIENTATION Error in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl<<std::endl;
 }
 
 void CartesianImpedanceP2P::P2PMovement(const Eigen::Vector3d& target_position, const Eigen::Vector3d& target_angles, const Eigen::Vector3d& position_start, double time, double T){
