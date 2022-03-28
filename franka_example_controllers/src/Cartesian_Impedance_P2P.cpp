@@ -178,6 +178,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
             // home.sendGoal(franka_gripper::HomingGoal());
         }
     }
+/*
     else if(waypoint == 2) {
         position_d_target << 0.4, 0, 0.03;
         angles_d_target   <<   0, 0,   0;
@@ -186,8 +187,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         if(GripperTask == 2) {
            GripperMove(0.06, 0.03);
         }
-    }  
-// /* 
+    }   
     else if(waypoint == 3) { // Grasp object here
         position_d_target << 0.4, 0, 0.03;
         angles_d_target   <<   0, 0,   0;
@@ -221,9 +221,9 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         waypoint    = 1;
         GripperTask = 1;
     } 
-//*/   
- /*
-     else if(waypoint == 3) { // to get steady pose at final waypoint
+    */   
+//  /*
+    else if(waypoint == 2) { // to get steady pose at final waypoint
          position_d     << position_d_target;
          velocity_d.setZero();
          acceleration_d.setZero();
@@ -234,7 +234,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
  
          orientation_d  = orientation_d.slerp(0.01, orientation_d_target);
      }
-*/
+// */
     else {
         position_d     << curr_position;
         velocity_d.setZero();
