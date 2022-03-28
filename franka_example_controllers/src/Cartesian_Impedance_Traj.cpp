@@ -212,7 +212,9 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
         } 
     }
     if (i >= X.rows() - 1){    //free nullspace movement, when trajectory finished
-        q_nullspace << q;
+        //q_nullspace << q;
+        i = 0;
+        mytime = 0;
     } 
 
 /////////////////////////////////////////// COMPUTE ERRORS ///////////////////////////////////////////////////
