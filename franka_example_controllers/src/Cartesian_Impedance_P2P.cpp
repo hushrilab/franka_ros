@@ -9,8 +9,8 @@
 #include <actionlib/client/simple_action_client.h>
 #include <franka_gripper/GraspAction.h>
 #include <franka_gripper/MoveAction.h>
-#include <franka_gripper/StopAction.h>
-#include <franka_gripper/HomingAction.h>
+
+#include <franka_msgs/SetLoad.h>
 
 namespace franka_example_controllers {
 
@@ -75,6 +75,8 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
         return false;
         }
     }
+    
+    client = node_handle.serviceClient<franka_msgs::SetLoad>("set_load");
 
     // Variable Initialization
     position_d                    << 0.5,   0, 0.5;
@@ -102,6 +104,10 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
 //    K_p.diagonal() << 400, 400, 1700,  40,  60,  12;
  //   K_d.diagonal() <<  10,  10,  80, 0.5, 1.0, 0.05;
     
+    // Factorization Damping Desgin
+    K_p1 << K_p.sqrt();
+    D_eta.diagonal() << 0.7, 0.7, 0.7, 0.7, 0.7, 0.7;
+
     C_hat.setZero();
     
     // Nullspace stiffness and damping
@@ -119,8 +125,7 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
  
     actionlib::SimpleActionClient<franka_gripper::MoveAction>   move( "franka_gripper/move", true);
     actionlib::SimpleActionClient<franka_gripper::GraspAction> grasp("franka_gripper/grasp", true);
-    actionlib::SimpleActionClient<franka_gripper::StopAction>   stop( "franka_gripper/stop", true);
-    actionlib::SimpleActionClient<franka_gripper::HomingAction> home( "franka_gripper/home", true);
+    franka_msgs::SetLoad srv;
 
 void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
 
@@ -149,11 +154,27 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     
     mytime = mytime + period.toSec();
     
+//     External Load (Book standing upright)
+    double mass_load = 1.371; // kg
+    double width     = 0.225; // m
+    double height    = 0.223; // m
+    double depth     = 0.035; // m
+    boost::array<double, 9> inertia_load = {mass_load/12 * (pow(depth, 2) + pow(height, 2)), 0, 0,
+                                            0, mass_load/12 * (pow(width, 2) + pow(height, 2)), 0,
+                                            0, 0, mass_load/12 * (pow(width, 2) + pow(depth, 2))};
+    boost::array<double, 3> CoGvec = {0, 0, 0.1925};
+    
+    srv.request.mass = mass_load;
+    srv.request.F_x_center_load = CoGvec; //this should be a vector of 3
+    srv.request.load_inertia = inertia_load ; //this should be a vector of 9
+    client.call(srv);
+    
     // get state variables
     franka::RobotState robot_state        = state_handle->getRobotState();
     std::array<double, 7>  coriolis_array = model_handle->getCoriolis();
     std::array<double, 42> jacobian_array = model_handle->getZeroJacobian(franka::Frame::kEndEffector);
     std::array<double, 49> mass_array     = model_handle->getMass();
+    // std::array<double, 49> mass_array     = model_handle->getMass(robot_state.q, load_inertia, mass_load, CoGvec);
     
     // convert to Eigen
     Eigen::Map<Eigen::Matrix<double, 7, 7>> mass(mass_array.data());
@@ -162,6 +183,8 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     Eigen::Map<Eigen::Matrix<double, 7, 1>> q(robot_state.q.data());
     Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(robot_state.dq.data());
     Eigen::Map<Eigen::Matrix<double, 7, 1>> tau_J_d(robot_state.tau_J_d.data());
+    
+    std::cout<<*robot_state.I_load.data()<<std::endl;
         
     mass_inv             << mass.inverse();
     TransformationMatrix =  Eigen::Matrix4d::Map(robot_state.O_T_EE.data());
@@ -187,7 +210,6 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         // home Gripper
         if(GripperTask == 1) {
             GripperMove(0.01, 0.01);
-            // home.sendGoal(franka_gripper::HomingGoal());
         }
     }
 /*
@@ -245,7 +267,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
                                  * Eigen::AngleAxisd(angles_d_target(2) * M_PI/180         , Eigen::Vector3d::UnitZ()); 
  
          orientation_d  = orientation_d.slerp(0.01, orientation_d_target);
-     }
+    }
 // */
     else {
         position_d     << curr_position;
@@ -283,11 +305,17 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
 
     Lambda         << (jacobian * mass_inv * jacobian.transpose()).inverse();
     
+    // Find best damping matrix: Factorization Damping Design
+    A              << Lambda.sqrt();
+    K_d            << A * D_eta * K_p1 + K_p1 * D_eta * A;
+    
     if (notFirstRun) {
         C_hat      << 0.5 * (Lambda - Lambda_prev) / period.toSec();
     } 
     
     F_tau          << Lambda * ddx - K_d * derror - K_p * error - C_hat * derror - Lambda * djacobian_filtered * dq;
+    
+//     F_tau          <<   -(K_d * derror + K_p * error);
     tau_task       << jacobian.transpose() * F_tau;
     
 //     nullspace control
@@ -329,8 +357,8 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         }
     }
 
-    std::cout << "Position Error in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl<<std::endl; 
-    std::cout << "ORIENTATION Error in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl<<std::endl;
+  //  std::cout << "Position Error in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl<<std::endl; 
+   // std::cout << "ORIENTATION Error in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl<<std::endl;
 }
 
 void CartesianImpedanceP2P::P2PMovement(const Eigen::Vector3d& target_position, const Eigen::Vector3d& target_angles, const Eigen::Vector3d& position_start, double time, double T){

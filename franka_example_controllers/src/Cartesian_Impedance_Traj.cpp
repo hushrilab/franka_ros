@@ -9,8 +9,8 @@
 #include <actionlib/client/simple_action_client.h>
 #include <franka_gripper/GraspAction.h>
 #include <franka_gripper/MoveAction.h>
-#include <franka_gripper/StopAction.h>
-#include <franka_gripper/HomingAction.h>
+
+#include <unsupported/Eigen/MatrixFunctions>
 
 namespace franka_example_controllers {
 
@@ -82,6 +82,10 @@ bool CartesianImpedanceTrajectory::init(hardware_interface::RobotHW* robot_hw,
     K_p.diagonal() << 700, 700, 700,  40,  60,  15;
     K_d.diagonal() <<  40,  40,  40, 1.5, 1.5, 0.1;
     
+    // Factorization Damping Desgin
+    K_p1 << K_p.sqrt();
+    D_eta.diagonal() << 0.7, 0.7, 0.7, 0.7, 0.7, 0.7;
+    
     C_hat.setZero();
     
     // Nullspace stiffness and damping
@@ -106,8 +110,6 @@ bool CartesianImpedanceTrajectory::init(hardware_interface::RobotHW* robot_hw,
  
     actionlib::SimpleActionClient<franka_gripper::MoveAction>   move1( "franka_gripper/move", true);
     actionlib::SimpleActionClient<franka_gripper::GraspAction> grasp1("franka_gripper/grasp", true);
-    actionlib::SimpleActionClient<franka_gripper::StopAction>   stop1( "franka_gripper/stop", true);
-    actionlib::SimpleActionClient<franka_gripper::HomingAction> home1( "franka_gripper/home", true);
 
 void CartesianImpedanceTrajectory::starting(const ros::Time& /*time*/) {
 
@@ -136,21 +138,21 @@ void CartesianImpedanceTrajectory::starting(const ros::Time& /*time*/) {
 void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::Duration& period) {
     
     mytime = mytime + period.toSec();
-
+    
     // get state variables
     franka::RobotState robot_state        = state_handle->getRobotState();
     std::array<double, 7>  coriolis_array = model_handle->getCoriolis();
     std::array<double, 42> jacobian_array = model_handle->getZeroJacobian(franka::Frame::kEndEffector);
     std::array<double, 49> mass_array     = model_handle->getMass();
-    
+   
     // convert to Eigen
-    Eigen::Map<Eigen::Matrix<double, 7, 7>> mass(mass_array.data());
+    Eigen::Map<Eigen::Matrix<double, 7, 7>> mass(mass_array.data());  
     Eigen::Map<Eigen::Matrix<double, 7, 1>> coriolis(coriolis_array.data());
     Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
     Eigen::Map<Eigen::Matrix<double, 7, 1>> q(robot_state.q.data());
     Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(robot_state.dq.data());
     Eigen::Map<Eigen::Matrix<double, 7, 1>> tau_J_d(robot_state.tau_J_d.data());
-        
+    
     mass_inv             << mass.inverse();
     TransformationMatrix =  Eigen::Matrix4d::Map(robot_state.O_T_EE.data());
     curr_position        =  TransformationMatrix.translation();
@@ -246,11 +248,17 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
 
     Lambda         << (jacobian * mass_inv * jacobian.transpose()).inverse();
     
+    // Find best damping matrix: Factorization Damping Design
+    A              << Lambda.sqrt();
+    K_d            << A * D_eta * K_p1 + K_p1 * D_eta * A;
+    
     if (notFirstRun) {
         C_hat      << 0.5 * (Lambda - Lambda_prev) / period.toSec();
     } 
     
     F_tau          << Lambda * ddx - K_d * derror - K_p * error - C_hat * derror - Lambda * djacobian_filtered * dq;
+    
+    //     F_tau <<   -(K_d * derror + K_p * error);
     tau_task       << jacobian.transpose() * F_tau;
     
 //     nullspace PD control
@@ -291,8 +299,8 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
             error_angles(j) = error_angles(j) + M_PI;
         }
     }
-    std::cout << "POSITION ERROR in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl<<std::endl; 
-    std::cout << "ORIENTATION ERROR in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl<<std::endl;
+   // std::cout << "POSITION ERROR in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl<<std::endl; 
+   // std::cout << "ORIENTATION ERROR in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl<<std::endl;
 }
 
 Eigen::Matrix<double, 7, 1> CartesianImpedanceTrajectory::saturateTorqueRate(const Eigen::Matrix<double, 7, 1>& tau_d_calculated,

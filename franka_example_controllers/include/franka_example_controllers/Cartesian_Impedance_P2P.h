@@ -15,6 +15,7 @@
 #include <ros/node_handle.h>
 #include <ros/time.h>
 #include <Eigen/Dense>
+#include <unsupported/Eigen/MatrixFunctions>
 
 #include <franka_hw/franka_model_interface.h>
 #include <franka_hw/franka_state_interface.h>
@@ -32,11 +33,8 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
 
  private:
   // Saturation
-  Eigen::Matrix<double, 7, 1> saturateTorqueRate(
-      const Eigen::Matrix<double, 7, 1>& tau_d_calculated,
-      const Eigen::Matrix<double, 7, 1>& tau_J_d);
+  Eigen::Matrix<double, 7, 1> saturateTorqueRate(const Eigen::Matrix<double, 7, 1>& tau_d_calculated,const Eigen::Matrix<double, 7, 1>& tau_J_d);
   void P2PMovement(const Eigen::Vector3d& target_position, const Eigen::Vector3d& target_angles, const Eigen::Vector3d& position_start, double time, double T);
-  // Filter
   void Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input,  const Eigen::MatrixXd& input_prev, Eigen::MatrixXd& y);
   void GripperMove(double width, double speed); 
   void GripperGrasp(double width, double speed, int force, double epsilon);
@@ -44,10 +42,16 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   std::unique_ptr<franka_hw::FrankaStateHandle> state_handle;
   std::unique_ptr<franka_hw::FrankaModelHandle> model_handle;
   std::vector<hardware_interface::JointHandle>  joint_handle;
+  ros::ServiceClient client;
   
   double mytime   = 0;
   int waypoint    = 1;
   int GripperTask = 1;
+  
+  // Damping Desgin
+  Eigen::Matrix<double, 6, 6> D_eta;
+  Eigen::Matrix<double, 6, 6> K_p1;
+  Eigen::Matrix<double, 6, 6> A;
   
   // Errors
   Eigen::Matrix<double, 6, 1> error;

@@ -125,6 +125,11 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   Eigen::Matrix<double, 7, 1> tau_d_saturated;
   Eigen::Matrix<double, 5, 1> gripper_command;
   
+    // Damping Desgin
+  Eigen::Matrix<double, 6, 6> D_eta;
+  Eigen::Matrix<double, 6, 6> K_p1;
+  Eigen::Matrix<double, 6, 6> A;
+  
   Eigen::Vector3d    curr_position;
   Eigen::Matrix<double, 6, 1> curr_velocity;
   Eigen::Matrix<double, 6, 1> ddx;
