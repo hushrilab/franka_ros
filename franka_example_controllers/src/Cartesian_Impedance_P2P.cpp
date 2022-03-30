@@ -191,8 +191,8 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
 //////////////////////////////////////////////   POINT to POINT MOVEMENT  /////////////////////////////////////////
     
     if(waypoint == 1) {
-        position_d_target << 0.5, 0.0, 0.5;
-        angles_d_target   <<   0, 0,   0;
+        position_d_target << 0.5, 0.2, 0.5;
+        angles_d_target   <<   0, 60,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
         // home Gripper
         if(GripperTask == 1) {
