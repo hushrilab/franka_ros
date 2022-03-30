@@ -16,6 +16,7 @@
 #include <ros/node_handle.h>
 #include <ros/time.h>
 #include <Eigen/Dense>
+#include <unsupported/Eigen/MatrixFunctions>
 
 #include <franka_hw/franka_model_interface.h>
 #include <franka_hw/franka_state_interface.h>
@@ -146,7 +147,8 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   Eigen::Vector3d    omega_d;
   Eigen::Vector3d    domega_d;
 
-  const double delta_tau_max_{1.0};   
+  const double delta_tau_max_{1.0};  
+  int j = 0;
 };
 
 }  // namespace franka_example_controllers

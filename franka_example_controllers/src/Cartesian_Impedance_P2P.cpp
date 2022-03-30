@@ -10,8 +10,6 @@
 #include <franka_gripper/GraspAction.h>
 #include <franka_gripper/MoveAction.h>
 
-#include <franka_msgs/SetLoad.h>
-
 namespace franka_example_controllers {
 
 bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
@@ -76,7 +74,10 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
         }
     }
     
-    client = node_handle.serviceClient<franka_msgs::SetLoad>("set_load");
+//     client = node_handle.serviceClient<franka_msgs::SetLoad>("set_load");
+//     srv.request.mass = mass_load;
+//     srv.request.F_x_center_load = CoGvec; //this should be a vector of 3
+//     srv.request.load_inertia = inertia_load ; //this should be a vector of 9
 
     // Variable Initialization
     position_d                    << 0.5,   0, 0.5;
@@ -121,11 +122,10 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     return true;
 }
 
-//////////////////////////////////////////// Gripper //////////////////////////////////////////////
+  //////////////////////////////////////////// Gripper //////////////////////////////////////////////
  
     actionlib::SimpleActionClient<franka_gripper::MoveAction>   move( "franka_gripper/move", true);
     actionlib::SimpleActionClient<franka_gripper::GraspAction> grasp("franka_gripper/grasp", true);
-    franka_msgs::SetLoad srv;
 
 void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
 
@@ -154,21 +154,6 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     
     mytime = mytime + period.toSec();
     
-//     External Load (Book standing upright)
-    double mass_load = 1.371; // kg
-    double width     = 0.225; // m
-    double height    = 0.223; // m
-    double depth     = 0.035; // m
-    boost::array<double, 9> inertia_load = {mass_load/12 * (pow(depth, 2) + pow(height, 2)), 0, 0,
-                                            0, mass_load/12 * (pow(width, 2) + pow(height, 2)), 0,
-                                            0, 0, mass_load/12 * (pow(width, 2) + pow(depth, 2))};
-    boost::array<double, 3> CoGvec = {0, 0, 0.1925};
-    
-    srv.request.mass = mass_load;
-    srv.request.F_x_center_load = CoGvec; //this should be a vector of 3
-    srv.request.load_inertia = inertia_load ; //this should be a vector of 9
-    client.call(srv);
-    
     // get state variables
     franka::RobotState robot_state        = state_handle->getRobotState();
     std::array<double, 7>  coriolis_array = model_handle->getCoriolis();
@@ -184,7 +169,8 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(robot_state.dq.data());
     Eigen::Map<Eigen::Matrix<double, 7, 1>> tau_J_d(robot_state.tau_J_d.data());
     
-    std::cout<<*robot_state.I_load.data()<<std::endl;
+//     std::cout<<robot_state.m_load<<std::endl;
+    
         
     mass_inv             << mass.inverse();
     TransformationMatrix =  Eigen::Matrix4d::Map(robot_state.O_T_EE.data());
@@ -195,6 +181,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     if (notFirstRun){ // in first run, period.toSec() is zero
             djacobian << (jacobian - jacobian_prev) / period.toSec();
     }
+//     if(!notFirstRun){    client.call(srv);}
     
     // FILTER SIGNALS 
     Eigen::MatrixXd y(7,7);
@@ -204,7 +191,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
 //////////////////////////////////////////////   POINT to POINT MOVEMENT  /////////////////////////////////////////
     
     if(waypoint == 1) {
-        position_d_target << 0.4, 0, 0.5;
+        position_d_target << 0.5, 0.0, 0.5;
         angles_d_target   <<   0, 0,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
         // home Gripper
@@ -212,51 +199,43 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
             GripperMove(0.01, 0.01);
         }
     }
-/*
+    /*
     else if(waypoint == 2) {
-        position_d_target << 0.4, 0, 0.03;
+        position_d_target << 0.5, 0.15, 0.3;
         angles_d_target   <<   0, 0,   0;
-        P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
-        // open Gripper
-        if(GripperTask == 2) {
-           GripperMove(0.06, 0.03);
-        }
+        P2PMovement(position_d_target, angles_d_target, position_init, mytime, 3);
     }   
-    else if(waypoint == 3) { // Grasp object here
-        position_d_target << 0.4, 0, 0.03;
+    else if(waypoint == 3) {
+        position_d_target << 0.5, -0.15, 0.3;
         angles_d_target   <<   0, 0,   0;
-        P2PMovement(position_d_target, angles_d_target, position_init, mytime, 1);
-        // Grasp
-        if(GripperTask == 3) {
-            GripperGrasp(0.035, 0.03, 30, 0.005);
-        }
+        P2PMovement(position_d_target, angles_d_target, position_init, mytime, 3);
     } 
-    else if(waypoint == 4) { // Hold object while moving
-        position_d_target << 0.5, 0, 0.4;
-        angles_d_target   <<   0, 60,   0;
-        P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
+    else if(waypoint == 4) {
+        position_d_target << 0.5, -0.3, 0.56;
+        angles_d_target   <<   0, 45,   0;
+        P2PMovement(position_d_target, angles_d_target, position_init, mytime, 3);
     } 
-    else if(waypoint == 5) { // Hold object while moving
-        position_d_target << 0.4, 0, 0.035;
-        angles_d_target   <<   0, 0,   0;
-        P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
+    else if(waypoint == 5) {
+        position_d_target << 0.5, -0.15, 0.82;
+        angles_d_target   <<   0, 90,   0;
+        P2PMovement(position_d_target, angles_d_target, position_init, mytime, 3);
     } 
-    else if(waypoint == 6) { // Drop object
-        position_d_target << 0.4, 0, 0.035;
-        angles_d_target   <<   0, 0,   0;
-        P2PMovement(position_d_target, angles_d_target, position_init, mytime, 1);
-        // open Gripper
-        if(GripperTask == 4) {
-           GripperMove(0.06, 0.03);
-        }
-    }
-    else if(waypoint == 7) { // Repeat motion
-// 	    stop.sendGoal(franka_gripper::StopGoal());
-        waypoint    = 1;
+    else if(waypoint == 6) {
+        position_d_target << 0.5, 0.15, 0.82;
+        angles_d_target   <<   0, 90,   0;
+        P2PMovement(position_d_target, angles_d_target, position_init, mytime, 3);
+    } 
+    else if(waypoint == 7) {
+        position_d_target << 0.5, 0.3, 0.56;
+        angles_d_target   <<   0, 45,   0;
+        P2PMovement(position_d_target, angles_d_target, position_init, mytime, 3);
+    } 
+    else if(waypoint == 8) { // Repeat motion
+        waypoint    = 2;
         GripperTask = 1;
     } 
-    */   
-//  /*
+    */
+ 
     else if(waypoint == 2) { // to get steady pose at final waypoint
          position_d     << position_d_target;
          velocity_d.setZero();
@@ -268,7 +247,6 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
  
          orientation_d  = orientation_d.slerp(0.01, orientation_d_target);
     }
-// */
     else {
         position_d     << curr_position;
         velocity_d.setZero();
@@ -356,9 +334,21 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
             error_angles(j) = error_angles(j) + M_PI;
         }
     }
-
+    
   //  std::cout << "Position Error in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl<<std::endl; 
    // std::cout << "ORIENTATION Error in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl<<std::endl;
+   
+   // STREAM DATA
+    if (j >= 200) {
+        std::cout << curr_position.transpose()<<std::endl;
+        std::cout << position_d.transpose()<<std::endl;
+        std::cout << curr_orientation.coeffs().transpose()<<std::endl;
+        std::cout << orientation_d.coeffs().transpose()<<std::endl;
+        std::cout << error.head(3).transpose() * 1000 <<std::endl;
+        std::cout << error_angles.transpose() * 180/M_PI<<std::endl;
+        j = 0;
+    }
+    j++;
 }
 
 void CartesianImpedanceP2P::P2PMovement(const Eigen::Vector3d& target_position, const Eigen::Vector3d& target_angles, const Eigen::Vector3d& position_start, double time, double T){

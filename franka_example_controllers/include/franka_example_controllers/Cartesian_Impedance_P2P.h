@@ -20,6 +20,8 @@
 #include <franka_hw/franka_model_interface.h>
 #include <franka_hw/franka_state_interface.h>
 
+#include <franka_msgs/SetLoad.h>
+
 namespace franka_example_controllers {
 
 class CartesianImpedanceP2P : public controller_interface::MultiInterfaceController<
@@ -43,10 +45,21 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   std::unique_ptr<franka_hw::FrankaModelHandle> model_handle;
   std::vector<hardware_interface::JointHandle>  joint_handle;
   ros::ServiceClient client;
+  franka_msgs::SetLoad srv;
   
   double mytime   = 0;
   int waypoint    = 1;
   int GripperTask = 1;
+    
+  //     External Load (Book standing upright)
+    double mass_load = 1.371; // kg
+    double width     = 0.225; // m
+    double height    = 0.223; // m
+    double depth     = 0.035; // m
+    boost::array<double, 9> inertia_load = {mass_load/12 * (pow(depth, 2) + pow(height, 2)), 0, 0,
+                                            0, mass_load/12 * (pow(width, 2) + pow(height, 2)), 0,
+                                            0, 0, mass_load/12 * (pow(width, 2) + pow(depth, 2))};
+    boost::array<double, 3> CoGvec       = {0, 0, 0.1925};
   
   // Damping Desgin
   Eigen::Matrix<double, 6, 6> D_eta;
@@ -111,6 +124,7 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   Eigen::Vector3d    domega_d;
   
   const double delta_tau_max_{1.0};   
+  int j = 0;
 };
 
 }  // namespace franka_example_controllers

@@ -10,8 +10,6 @@
 #include <franka_gripper/GraspAction.h>
 #include <franka_gripper/MoveAction.h>
 
-#include <unsupported/Eigen/MatrixFunctions>
-
 namespace franka_example_controllers {
 
 bool CartesianImpedanceTrajectory::init(hardware_interface::RobotHW* robot_hw,
@@ -301,6 +299,18 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
     }
    // std::cout << "POSITION ERROR in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl<<std::endl; 
    // std::cout << "ORIENTATION ERROR in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl<<std::endl;
+   
+    // STREAM DATA
+    if (j >= 200) {
+        std::cout << curr_position.transpose()<<std::endl;
+        std::cout << position_d.transpose()<<std::endl;
+        std::cout << curr_orientation.coeffs().transpose()<<std::endl;
+        std::cout << orientation_d.coeffs().transpose()<<std::endl;
+        std::cout << error.head(3).transpose() * 1000 <<std::endl;
+        std::cout << error_angles.transpose() * 180/M_PI<<std::endl;
+        j = 0;
+    }
+    j++;
 }
 
 Eigen::Matrix<double, 7, 1> CartesianImpedanceTrajectory::saturateTorqueRate(const Eigen::Matrix<double, 7, 1>& tau_d_calculated,
