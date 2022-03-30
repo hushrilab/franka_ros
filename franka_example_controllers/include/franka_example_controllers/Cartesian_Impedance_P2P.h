@@ -44,8 +44,8 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   std::unique_ptr<franka_hw::FrankaStateHandle> state_handle;
   std::unique_ptr<franka_hw::FrankaModelHandle> model_handle;
   std::vector<hardware_interface::JointHandle>  joint_handle;
-  ros::ServiceClient client;
-  franka_msgs::SetLoad srv;
+  //ros::ServiceClient client;
+  //franka_msgs::SetLoad srv;
   
   double mytime   = 0;
   int waypoint    = 1;

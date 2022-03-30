@@ -90,31 +90,31 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     dderror.setZero();
     
     //   For Impedance Controller
-    K_p.diagonal() << 500, 500, 600,  40,  60,  12;
-    K_d.diagonal() <<  25,  25,  30, 1.5, 1.5, 0.1;
+    K_p.diagonal() << 500, 500, 600,  30,  40,  12;
+   // K_d.diagonal() <<  25,  25,  30, 1.5, 1.5, 0.1;
 
 // Soft Position, stiff orientation
-  //  K_p.diagonal() << 300, 300, 300,  140,  160,  115;
-  //  K_d.diagonal() <<  20,  20,  20, 10.5, 10.0, 10.2;
+ //   K_p.diagonal() << 300, 300, 300,  140,  160,  115;
+ //   K_d.diagonal() <<  20,  20,  20, 10.5, 10.0, 10.2;
 
 // Stiff Position, soft orientation
- //   K_p.diagonal() << 1500, 1500, 1500,  20,  20,  5;
- //  K_d.diagonal() <<  80,  80,  80, 0.5, 0.5, 0.2;
+  //  K_p.diagonal() << 1500, 1500, 1500,  20,  20,  5;
+ //   K_d.diagonal() <<  80,  80,  80, 0.5, 0.5, 0.2;
 
 // Stiff z-axis
 //    K_p.diagonal() << 400, 400, 1700,  40,  60,  12;
- //   K_d.diagonal() <<  10,  10,  80, 0.5, 1.0, 0.05;
+//    K_d.diagonal() <<  10,  10,  80, 0.5, 1.0, 0.05;
     
     // Factorization Damping Desgin
     K_p1 << K_p.sqrt();
-    D_eta.diagonal() << 0.7, 0.7, 0.7, 0.7, 0.7, 0.7;
+    D_eta.diagonal() << 0.05, 0.3, 0.3, 0.4, 0.3, 0.4;
 
     C_hat.setZero();
     
     // Nullspace stiffness and damping
     K_N.setIdentity();
     D_N.setIdentity();
-    K_N << K_N * 25;
+    K_N << K_N * 15;
     D_N << D_N * sqrt(K_N(0,0));  
     I.setIdentity();
     
@@ -191,12 +191,12 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
 //////////////////////////////////////////////   POINT to POINT MOVEMENT  /////////////////////////////////////////
     
     if(waypoint == 1) {
-        position_d_target << 0.5, 0.2, 0.5;
-        angles_d_target   <<   0, 60,   0;
+        position_d_target << 0.4, 0.0, 0.5;
+        angles_d_target   <<   0, 0,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
         // home Gripper
         if(GripperTask == 1) {
-            GripperMove(0.01, 0.01);
+            GripperMove(0.03, 0.01);
         }
     }
     /*
@@ -335,17 +335,17 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         }
     }
     
-  //  std::cout << "Position Error in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl<<std::endl; 
-   // std::cout << "ORIENTATION Error in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl<<std::endl;
+    std::cout << "Position Error in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl<<std::endl; 
+    std::cout << "ORIENTATION Error in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl<<std::endl;
    
    // STREAM DATA
     if (j >= 200) {
-        std::cout << curr_position.transpose()<<std::endl;
-        std::cout << position_d.transpose()<<std::endl;
-        std::cout << curr_orientation.coeffs().transpose()<<std::endl;
-        std::cout << orientation_d.coeffs().transpose()<<std::endl;
-        std::cout << error.head(3).transpose() * 1000 <<std::endl;
-        std::cout << error_angles.transpose() * 180/M_PI<<std::endl;
+  //      std::cout << curr_position.transpose()<<std::endl;
+  //      std::cout << position_d.transpose()<<std::endl;
+  //      std::cout << curr_orientation.coeffs().transpose()<<std::endl;
+  //      std::cout << orientation_d.coeffs().transpose()<<std::endl;
+  //      std::cout << error.head(3).transpose() * 1000 <<std::endl;
+  //      std::cout << error_angles.transpose() * 180/M_PI<<std::endl;
         j = 0;
     }
     j++;

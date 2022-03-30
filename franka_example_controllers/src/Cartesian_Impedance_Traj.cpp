@@ -82,7 +82,7 @@ bool CartesianImpedanceTrajectory::init(hardware_interface::RobotHW* robot_hw,
     
     // Factorization Damping Desgin
     K_p1 << K_p.sqrt();
-    D_eta.diagonal() << 0.7, 0.7, 0.7, 0.7, 0.7, 0.7;
+    D_eta.diagonal() << 0.1, 0.3, 0.3, 0.4, 0.4, 0.4;
     
     C_hat.setZero();
     
@@ -185,7 +185,6 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
         acceleration_d <<                  dds * (position_d_target - position_init);  
         orientation_d  =  orientation_d.slerp(10/T * s/1000, orientation_d_target);
         q_nullspace    << q_nullspace_init + s * (q_nullspace_target - q_nullspace_init);
-        // or make D_N very high
     }
     else {
         // FOLLOW TRAJECTORY FROM MATLAB
@@ -297,17 +296,17 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
             error_angles(j) = error_angles(j) + M_PI;
         }
     }
-   // std::cout << "POSITION ERROR in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl<<std::endl; 
-   // std::cout << "ORIENTATION ERROR in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl<<std::endl;
+    std::cout << "POSITION ERROR in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl<<std::endl; 
+    std::cout << "ORIENTATION ERROR in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl<<std::endl;
    
     // STREAM DATA
     if (j >= 200) {
-        std::cout << curr_position.transpose()<<std::endl;
-        std::cout << position_d.transpose()<<std::endl;
-        std::cout << curr_orientation.coeffs().transpose()<<std::endl;
-        std::cout << orientation_d.coeffs().transpose()<<std::endl;
-        std::cout << error.head(3).transpose() * 1000 <<std::endl;
-        std::cout << error_angles.transpose() * 180/M_PI<<std::endl;
+  //      std::cout << curr_position.transpose()<<std::endl;
+  //      std::cout << position_d.transpose()<<std::endl;
+   //     std::cout << curr_orientation.coeffs().transpose()<<std::endl;
+   //     std::cout << orientation_d.coeffs().transpose()<<std::endl;
+   //     std::cout << error.head(3).transpose() * 1000 <<std::endl;
+  //      std::cout << error_angles.transpose() * 180/M_PI<<std::endl;
         j = 0;
     }
     j++;
