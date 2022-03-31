@@ -300,7 +300,7 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
     std::cout << "ORIENTATION ERROR in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl<<std::endl;
    
     // STREAM DATA
-    if (j >= 200) {
+    if (j >= 100) {
   //      std::cout << curr_position.transpose()<<std::endl;
   //      std::cout << position_d.transpose()<<std::endl;
    //     std::cout << curr_orientation.coeffs().transpose()<<std::endl;
@@ -310,6 +310,10 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
         j = 0;
     }
     j++;
+}
+
+void CartesianImpedanceTrajectory::stopping(const ros::Time& /*time*/) {
+    GripperMove(0.08, 0.01);
 }
 
 Eigen::Matrix<double, 7, 1> CartesianImpedanceTrajectory::saturateTorqueRate(const Eigen::Matrix<double, 7, 1>& tau_d_calculated,

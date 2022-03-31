@@ -32,6 +32,7 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   bool init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& node_handle) override;
   void starting(const ros::Time&) override;
   void update(const ros::Time&, const ros::Duration& period) override;
+  void stopping(const ros::Time&) override;
 
  private:
   // Saturation
@@ -44,12 +45,13 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   std::unique_ptr<franka_hw::FrankaStateHandle> state_handle;
   std::unique_ptr<franka_hw::FrankaModelHandle> model_handle;
   std::vector<hardware_interface::JointHandle>  joint_handle;
-  //ros::ServiceClient client;
-  //franka_msgs::SetLoad srv;
+  ros::ServiceClient client;
+  franka_msgs::SetLoad srv;
   
   double mytime   = 0;
   int waypoint    = 1;
   int GripperTask = 1;
+  int j = 0;
     
   //     External Load (Book standing upright)
     double mass_load = 1.371; // kg
@@ -124,7 +126,6 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   Eigen::Vector3d    domega_d;
   
   const double delta_tau_max_{1.0};   
-  int j = 0;
 };
 
 }  // namespace franka_example_controllers
