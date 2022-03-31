@@ -9,6 +9,7 @@
 #include <actionlib/client/simple_action_client.h>
 #include <franka_gripper/GraspAction.h>
 #include <franka_gripper/MoveAction.h>
+#include <franka_gripper/StopAction.h>
 
 namespace franka_example_controllers {
 
@@ -98,9 +99,8 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw, ros::Nod
     K_N << K_N * 15;
     D_N << D_N * sqrt(K_N(0,0));  
     I.setIdentity();
-    
-    // Initialize client to set load after object is grasped
-    client = node_handle.serviceClient<franka_msgs::SetLoad> ("/set_load");
+
+    client = node_handle.serviceClient<franka_msgs::SetLoad> ("franka_control/set_load");
     
     notFirstRun = false;
     return true;
@@ -110,6 +110,7 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw, ros::Nod
  
     actionlib::SimpleActionClient<franka_gripper::MoveAction>   move( "franka_gripper/move", true);
     actionlib::SimpleActionClient<franka_gripper::GraspAction> grasp("franka_gripper/grasp", true);
+    actionlib::SimpleActionClient<franka_gripper::StopAction> stop("franka_gripper/stop", true);
 
 void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
 
@@ -132,6 +133,7 @@ void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
     q_nullspace          <<  q_initial;
     jacobian_prev        <<  jacobian;
     djacobian.setZero();
+    stop.sendGoal(franka_gripper::StopGoal());
 }
     
 void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duration& period) {
@@ -151,8 +153,6 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     Eigen::Map<Eigen::Matrix<double, 7, 1>> q(robot_state.q.data());
     Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(robot_state.dq.data());
     Eigen::Map<Eigen::Matrix<double, 7, 1>> tau_J_d(robot_state.tau_J_d.data());
-    
- //   std::cout<<robot_state.m_total<<std::endl;
     
     mass_inv             << mass.inverse();
     TransformationMatrix =  Eigen::Matrix4d::Map(robot_state.O_T_EE.data());
@@ -176,12 +176,12 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         angles_d_target   <<   0, 0,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
         // home Gripper
-        if(GripperTask == 1 && notFirstRun) {
-            GripperMove(0.03, 0.01);
+        if(GripperTask == 1 && mytime > 1) {
+           GripperMove(0.03, 0.01);
         }
     }
-    else if(waypoint == 2) {
-        position_d_target << 0.4, 0, 0.03;
+ /*   else if(waypoint == 2) {
+        position_d_target << 0.4, 0, 0.07;
         angles_d_target   <<   0, 0,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
         // open Gripper
@@ -190,49 +190,54 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         }
     }   
     else if(waypoint == 3) { // Grasp object here
-        position_d_target << 0.4, 0, 0.03;
+        position_d_target << 0.4, 0, 0.07;
         angles_d_target   <<   0, 0,   0;
-        P2PMovement(position_d_target, angles_d_target, position_init, mytime, 1);
+        P2PMovement(position_d_target, angles_d_target, position_init, mytime, 2);
         // Grasp
         if(GripperTask == 3) {
-            GripperGrasp(0.035, 0.03, 30, 0.005);
+            GripperGrasp(0.012, 0.03, 50, 0.005);
         }
     } 
     else if(waypoint == 4) { // Hold object while moving
-        position_d_target << 0.5, 0, 0.4;
-        angles_d_target   <<   0, 60,   0;
+        position_d_target << 0.5, 0, 0.2;
+        angles_d_target   <<   0, 0,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
-        if (GripperTask == 5) {
+        if (GripperTask == 4) {
             srv.request.mass = mass_load;
             srv.request.F_x_center_load = center_of_gravity;
             srv.request.load_inertia = inertia_load;
             client.call(srv);
+	    std::cout<<" First client call "<<client.call(srv)<<std::endl;
+    std::cout<<robot_state.m_total<<std::endl;
             GripperTask++;
         }
     } 
     else if(waypoint == 5) { // Hold object while moving
-        position_d_target << 0.4, 0, 0.035;
+        position_d_target << 0.4, 0, 0.07;
         angles_d_target   <<   0, 0,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
     } 
     else if(waypoint == 6) { // Drop object
-        position_d_target << 0.4, 0, 0.035;
+        position_d_target << 0.4, 0, 0.07;
         angles_d_target   <<   0, 0,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 1);
         // open Gripper
-        if(GripperTask == 4) {
+        if(GripperTask == 5) {
             GripperMove(0.06, 0.03);
             srv.request.mass = 0;
             srv.request.F_x_center_load = {0,0,0};
             srv.request.load_inertia = {0,0,0,0,0,0,0,0,0};
-            client.call(srv);
+            client2.call(srv);
+std::cout<<" second client call "<<client2.call(srv)<<std::endl;
+    std::cout<<robot_state.m_total<<std::endl;
+    
         }
     }
     else if(waypoint == 7) { // Repeat motion
         waypoint    = 1;
         GripperTask = 1;
     } 
-/*
+*/
     else if(waypoint == 2) { // to get steady pose at final waypoint
          position_d     << position_d_target;
          velocity_d.setZero();
@@ -244,7 +249,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
  
          orientation_d  = orientation_d.slerp(0.01, orientation_d_target);
     }
-    */
+    
     else {
         position_d     << curr_position;
         velocity_d.setZero();
@@ -289,9 +294,9 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         C_hat      << 0.5 * (Lambda - Lambda_prev) / period.toSec();
     } 
     
-    F_tau          << Lambda * ddx - K_d * derror - K_p * error - C_hat * derror - Lambda * djacobian_filtered * dq;
+   // F_tau          << Lambda * ddx - K_d * derror - K_p * error - C_hat * derror - Lambda * djacobian_filtered * dq;
     
-//     F_tau          <<   -(K_d * derror + K_p * error);
+    F_tau          <<   -(K_d * derror + K_p * error);
     tau_task       << jacobian.transpose() * F_tau;
     
 //     nullspace control
@@ -333,26 +338,22 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         }
     }
     
- //   std::cout << "Position Error in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl<<std::endl; 
-  //  std::cout << "ORIENTATION Error in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl<<std::endl;
+   // std::cout << "Position Error in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl<<std::endl; 
+   // std::cout << "ORIENTATION Error in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl<<std::endl;
    
    // STREAM DATA
     if (j >= 100) {
-  //      std::cout << curr_position.transpose()<<std::endl;
-  //      std::cout << position_d.transpose()<<std::endl;
-  //      std::cout << curr_orientation.coeffs().transpose()<<std::endl;
-  //      std::cout << orientation_d.coeffs().transpose()<<std::endl;
-  //      std::cout << error.head(3).transpose() * 1000 <<std::endl;
-  //      std::cout << error_angles.transpose() * 180/M_PI<<std::endl;
+        std::cout << curr_position.transpose()<<std::endl;
+        std::cout << position_d.transpose()<<std::endl;
+        std::cout << curr_orientation.coeffs().transpose()<<std::endl;
+        std::cout << orientation_d.coeffs().transpose()<<std::endl;
+        std::cout << error.head(3).transpose() * 1000 <<std::endl;
+        std::cout << error_angles.transpose() * 180/M_PI<<std::endl;
         j = 0;
     }
     j++;
 }
 
-void CartesianImpedanceP2P::stopping(const ros::Time& /*time*/) {
-    std::cout<<"Stopping"<<std::endl;
-    GripperMove(0.07, 0.01);
-}
 
 void CartesianImpedanceP2P::P2PMovement(const Eigen::Vector3d& target_position, const Eigen::Vector3d& target_angles, const Eigen::Vector3d& position_start, double time, double T){
     
@@ -385,6 +386,10 @@ void CartesianImpedanceP2P::P2PMovement(const Eigen::Vector3d& target_position, 
         dds    = 0;
         position_init << position_d;
     }
+}
+
+void CartesianImpedanceP2P::stopping(const ros::Time& /*time*/) {
+std::cout<<">>>>>>>>>>>>>>>>>>>>>>>>>Stop<<<<<<<<<<<<<<<<<<<<<<<"<<std::endl;
 }
 
 Eigen::Matrix<double, 7, 1> CartesianImpedanceP2P::saturateTorqueRate(const Eigen::Matrix<double, 7, 1>& tau_d_calculated,

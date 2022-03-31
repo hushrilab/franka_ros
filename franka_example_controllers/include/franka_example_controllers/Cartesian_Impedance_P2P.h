@@ -54,14 +54,14 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   int j = 0;
     
   //     External Load (Book standing upright)
-    double mass_load = 1.371; // kg
-    double width     = 0.225; // m
-    double height    = 0.223; // m
-    double depth     = 0.035; // m
+    double mass_load = 0.991; // kg
+    double width     = 0.285; // m
+    double height    = 0.100; // m
+    double depth     = 0.012; // m
     boost::array<double, 9> inertia_load      = {mass_load/12 * (pow(depth, 2) + pow(height, 2)), 0, 0,
                                                  0, mass_load/12 * (pow(width, 2) + pow(height, 2)), 0,
                                                  0, 0, mass_load/12 * (pow(width, 2) + pow(depth, 2))};
-    boost::array<double, 3> center_of_gravity = {0, 0, 0.1925};
+    boost::array<double, 3> center_of_gravity = {0, 0, 0.135};
   
   // Damping Desgin
   Eigen::Matrix<double, 6, 6> D_eta;

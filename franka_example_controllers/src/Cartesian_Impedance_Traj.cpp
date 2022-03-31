@@ -77,12 +77,12 @@ bool CartesianImpedanceTrajectory::init(hardware_interface::RobotHW* robot_hw, r
     dderror.setZero();
     
     //   For Impedance Controller
-    K_p.diagonal() << 700, 700, 700,  40,  60,  15;
+    K_p.diagonal() << 700, 700, 700,  40,  40,  10;
     K_d.diagonal() <<  40,  40,  40, 1.5, 1.5, 0.1;
     
     // Factorization Damping Desgin
     K_p1 << K_p.sqrt();
-    D_eta.diagonal() << 0.1, 0.3, 0.3, 0.4, 0.4, 0.4;
+    D_eta.diagonal() << 0.3, 0.3, 0.3, 0.4, 0.4, 0.4;
     
     C_hat.setZero();
     
@@ -130,7 +130,8 @@ void CartesianImpedanceTrajectory::starting(const ros::Time& /*time*/) {
     q_nullspace          <<  q_initial;
     q_nullspace_init     <<  q_initial;
     jacobian_prev        <<  jacobian;
-    djacobian.setZero();
+    djacobian.setZero(); 
+
 }
 
 void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::Duration& period) {
@@ -296,24 +297,24 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
             error_angles(j) = error_angles(j) + M_PI;
         }
     }
-    std::cout << "POSITION ERROR in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl<<std::endl; 
-    std::cout << "ORIENTATION ERROR in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl<<std::endl;
+//    std::cout << "POSITION ERROR in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl<<std::endl; 
+//    std::cout << "ORIENTATION ERROR in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl<<std::endl;
    
     // STREAM DATA
     if (j >= 100) {
-  //      std::cout << curr_position.transpose()<<std::endl;
-  //      std::cout << position_d.transpose()<<std::endl;
-   //     std::cout << curr_orientation.coeffs().transpose()<<std::endl;
-   //     std::cout << orientation_d.coeffs().transpose()<<std::endl;
-   //     std::cout << error.head(3).transpose() * 1000 <<std::endl;
-  //      std::cout << error_angles.transpose() * 180/M_PI<<std::endl;
+        std::cout << curr_position.transpose()<<std::endl;
+        std::cout << position_d.transpose()<<std::endl;
+        std::cout << curr_orientation.coeffs().transpose()<<std::endl;
+        std::cout << orientation_d.coeffs().transpose()<<std::endl;
+        std::cout << error.head(3).transpose() * 1000 <<std::endl;
+        std::cout << error_angles.transpose() * 180/M_PI<<std::endl;
         j = 0;
     }
     j++;
 }
 
 void CartesianImpedanceTrajectory::stopping(const ros::Time& /*time*/) {
-    std::cout<<"Stopping"<<std::endl;
+    //std::cout<<"Stopping"<<std::endl;
     GripperMove(0.07, 0.01);
 }
 
