@@ -12,8 +12,8 @@
 
 namespace franka_example_controllers {
 
-bool CartesianImpedanceTrajectory::init(hardware_interface::RobotHW* robot_hw,
-                                               ros::NodeHandle& node_handle) {
+bool CartesianImpedanceTrajectory::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& node_handle) {
+    
     std::string arm_id;
     if (!node_handle.getParam("arm_id", arm_id)) {
         ROS_ERROR_STREAM("CartesianImpedanceTrajectory: Could not read parameter arm_id");
@@ -313,7 +313,8 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
 }
 
 void CartesianImpedanceTrajectory::stopping(const ros::Time& /*time*/) {
-    GripperMove(0.08, 0.01);
+    std::cout<<"Stopping"<<std::endl;
+    GripperMove(0.07, 0.01);
 }
 
 Eigen::Matrix<double, 7, 1> CartesianImpedanceTrajectory::saturateTorqueRate(const Eigen::Matrix<double, 7, 1>& tau_d_calculated,

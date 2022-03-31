@@ -12,8 +12,7 @@
 
 namespace franka_example_controllers {
 
-bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
-                                               ros::NodeHandle& node_handle) {
+bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& node_handle) {
 
     std::string arm_id;
     if (!node_handle.getParam("arm_id", arm_id)) {
@@ -100,11 +99,8 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw,
     D_N << D_N * sqrt(K_N(0,0));  
     I.setIdentity();
     
-    client = node_handle.serviceClient<franka_msgs::SetLoad>("set_load", true);
-    srv.request.mass = 1000; //mass_load;
-    srv.request.F_x_center_load = {0,0,0.17}; //CoGvec;
-    srv.request.load_inertia = {1,0,0,0,1,0,0,0,1}; //inertia_load;
-    client.call(srv);
+    // Initialize client to set load after object is grasped
+    client = node_handle.serviceClient<franka_msgs::SetLoad> ("/set_load");
     
     notFirstRun = false;
     return true;
@@ -147,7 +143,6 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     std::array<double, 7>  coriolis_array = model_handle->getCoriolis();
     std::array<double, 42> jacobian_array = model_handle->getZeroJacobian(franka::Frame::kEndEffector);
     std::array<double, 49> mass_array     = model_handle->getMass();
-    // std::array<double, 49> mass_array     = model_handle->getMass(robot_state.q, load_inertia, mass_load, CoGvec);
     
     // convert to Eigen
     Eigen::Map<Eigen::Matrix<double, 7, 7>> mass(mass_array.data());
@@ -157,7 +152,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     Eigen::Map<Eigen::Matrix<double, 7, 1>> dq(robot_state.dq.data());
     Eigen::Map<Eigen::Matrix<double, 7, 1>> tau_J_d(robot_state.tau_J_d.data());
     
-    std::cout<<robot_state.m_total<<std::endl;
+ //   std::cout<<robot_state.m_total<<std::endl;
     
     mass_inv             << mass.inverse();
     TransformationMatrix =  Eigen::Matrix4d::Map(robot_state.O_T_EE.data());
@@ -168,7 +163,6 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     if (notFirstRun){ // in first run, period.toSec() is zero
             djacobian << (jacobian - jacobian_prev) / period.toSec();
     }
-//     if(!notFirstRun){    client.call(srv);}
     
     // FILTER SIGNALS 
     Eigen::MatrixXd y(7,7);
@@ -186,14 +180,13 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
             GripperMove(0.03, 0.01);
         }
     }
-/*
     else if(waypoint == 2) {
         position_d_target << 0.4, 0, 0.03;
         angles_d_target   <<   0, 0,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
         // open Gripper
         if(GripperTask == 2) {
-           GripperMove(0.06, 0.03);
+            GripperMove(0.06, 0.03);
         }
     }   
     else if(waypoint == 3) { // Grasp object here
@@ -209,6 +202,13 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         position_d_target << 0.5, 0, 0.4;
         angles_d_target   <<   0, 60,   0;
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 5);
+        if (GripperTask == 5) {
+            srv.request.mass = mass_load;
+            srv.request.F_x_center_load = center_of_gravity;
+            srv.request.load_inertia = inertia_load;
+            client.call(srv);
+            GripperTask++;
+        }
     } 
     else if(waypoint == 5) { // Hold object while moving
         position_d_target << 0.4, 0, 0.035;
@@ -221,15 +221,18 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         P2PMovement(position_d_target, angles_d_target, position_init, mytime, 1);
         // open Gripper
         if(GripperTask == 4) {
-           GripperMove(0.06, 0.03);
+            GripperMove(0.06, 0.03);
+            srv.request.mass = 0;
+            srv.request.F_x_center_load = {0,0,0};
+            srv.request.load_inertia = {0,0,0,0,0,0,0,0,0};
+            client.call(srv);
         }
     }
     else if(waypoint == 7) { // Repeat motion
-// 	    stop.sendGoal(franka_gripper::StopGoal());
         waypoint    = 1;
         GripperTask = 1;
     } 
-    */
+/*
     else if(waypoint == 2) { // to get steady pose at final waypoint
          position_d     << position_d_target;
          velocity_d.setZero();
@@ -241,6 +244,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
  
          orientation_d  = orientation_d.slerp(0.01, orientation_d_target);
     }
+    */
     else {
         position_d     << curr_position;
         velocity_d.setZero();
@@ -346,7 +350,8 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
 }
 
 void CartesianImpedanceP2P::stopping(const ros::Time& /*time*/) {
-    GripperMove(0.08, 0.01);
+    std::cout<<"Stopping"<<std::endl;
+    GripperMove(0.07, 0.01);
 }
 
 void CartesianImpedanceP2P::P2PMovement(const Eigen::Vector3d& target_position, const Eigen::Vector3d& target_angles, const Eigen::Vector3d& position_start, double time, double T){

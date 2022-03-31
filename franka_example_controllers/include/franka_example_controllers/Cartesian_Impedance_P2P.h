@@ -58,10 +58,10 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
     double width     = 0.225; // m
     double height    = 0.223; // m
     double depth     = 0.035; // m
-    boost::array<double, 9> inertia_load = {mass_load/12 * (pow(depth, 2) + pow(height, 2)), 0, 0,
-                                            0, mass_load/12 * (pow(width, 2) + pow(height, 2)), 0,
-                                            0, 0, mass_load/12 * (pow(width, 2) + pow(depth, 2))};
-    boost::array<double, 3> CoGvec       = {0, 0, 0.1925};
+    boost::array<double, 9> inertia_load      = {mass_load/12 * (pow(depth, 2) + pow(height, 2)), 0, 0,
+                                                 0, mass_load/12 * (pow(width, 2) + pow(height, 2)), 0,
+                                                 0, 0, mass_load/12 * (pow(width, 2) + pow(depth, 2))};
+    boost::array<double, 3> center_of_gravity = {0, 0, 0.1925};
   
   // Damping Desgin
   Eigen::Matrix<double, 6, 6> D_eta;
