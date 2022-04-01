@@ -41,6 +41,7 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   void Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input,  const Eigen::MatrixXd& input_prev, Eigen::MatrixXd& y);
   void GripperMove(double width, double speed); 
   void GripperGrasp(double width, double speed, int force, double epsilon);
+  void SetLoad(double mass_old, double mass_new, double time, double t);
 
   std::unique_ptr<franka_hw::FrankaStateHandle> state_handle;
   std::unique_ptr<franka_hw::FrankaModelHandle> model_handle;
@@ -67,6 +68,8 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   Eigen::Matrix<double, 6, 6> D_eta;
   Eigen::Matrix<double, 6, 6> K_p1;
   Eigen::Matrix<double, 6, 6> A;
+  Eigen::Matrix<double, 6, 1> external_load;
+  double m = 0;
   
   // Errors
   Eigen::Matrix<double, 6, 1> error;
