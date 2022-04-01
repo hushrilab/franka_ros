@@ -20,8 +20,6 @@
 #include <franka_hw/franka_model_interface.h>
 #include <franka_hw/franka_state_interface.h>
 
-#include <franka_msgs/SetLoad.h>
-
 namespace franka_example_controllers {
 
 class CartesianImpedanceP2P : public controller_interface::MultiInterfaceController<
@@ -32,7 +30,7 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   bool init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& node_handle) override;
   void starting(const ros::Time&) override;
   void update(const ros::Time&, const ros::Duration& period) override;
-  void stopping(const ros::Time&) override;
+//   void stopping(const ros::Time&) override;
 
  private:
   // Saturation
@@ -41,28 +39,26 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   void Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input,  const Eigen::MatrixXd& input_prev, Eigen::MatrixXd& y);
   void GripperMove(double width, double speed); 
   void GripperGrasp(double width, double speed, int force, double epsilon);
-  void SetLoad(double mass_old, double mass_new, double time, double t);
+  void SetLoad(double mass_old, double mass_new, std::array<double, 3> vec2CoG, double time, double t);
 
   std::unique_ptr<franka_hw::FrankaStateHandle> state_handle;
   std::unique_ptr<franka_hw::FrankaModelHandle> model_handle;
   std::vector<hardware_interface::JointHandle>  joint_handle;
-  ros::ServiceClient client;
-  franka_msgs::SetLoad srv;
   
   double mytime   = 0;
   int waypoint    = 1;
   int GripperTask = 1;
   int j = 0;
     
-  //     External Load (Book standing upright)
-    double mass_load = 0.991; // kg
-    double width     = 0.285; // m
-    double height    = 0.100; // m
-    double depth     = 0.012; // m
-    boost::array<double, 9> inertia_load      = {mass_load/12 * (pow(depth, 2) + pow(height, 2)), 0, 0,
-                                                 0, mass_load/12 * (pow(width, 2) + pow(height, 2)), 0,
-                                                 0, 0, mass_load/12 * (pow(width, 2) + pow(depth, 2))};
-    boost::array<double, 3> center_of_gravity = {0, 0, 0.135};
+  //     External Load (Alu block standing upright)
+  double mass_load = 0.991; // kg
+  double width     = 0.285; // m
+  double height    = 0.100; // m
+  double depth     = 0.012; // m
+  std::array<double, 9> inertia_load      = {mass_load/12 * (pow(depth, 2) + pow(height, 2)), 0, 0,
+                                             0, mass_load/12 * (pow(width, 2) + pow(height, 2)), 0,
+                                             0, 0, mass_load/12 * (pow(width, 2) + pow(depth, 2))};
+  std::array<double, 3> center_of_gravity = {0.1, 0.1, 0.135};
   
   // Damping Desgin
   Eigen::Matrix<double, 6, 6> D_eta;
