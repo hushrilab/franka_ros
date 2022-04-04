@@ -3,7 +3,6 @@
 
 #include <cmath>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <vector>
 #include <fstream>
@@ -31,8 +30,8 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   bool init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& node_handle) override;
   void starting(const ros::Time&) override;
   void update(const ros::Time&, const ros::Duration& period) override;
-  void stopping(const ros::Time&) override;
-
+//   void stopping(const ros::Time&) override;
+  
  private:
   // Saturation
   Eigen::Matrix<double, 7, 1> saturateTorqueRate(
@@ -43,6 +42,7 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   void Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input,  const Eigen::MatrixXd& input_prev, Eigen::MatrixXd& y);
   void GripperMove(double width, double speed); 
   void GripperGrasp(double width, double speed, int force, double epsilon);
+  void SetLoad(double mass_old, double mass_new, std::array<double, 3> vec2CoG, double time, double t);
   
   //  Function to lad csv files; Source: https://stackoverflow.com/questions/34247057/how-to-read-csv-file-and-assign-to-eigen-matrix
   template<typename M> M load_csv (const std::string & path, const std::string & filename) {
@@ -67,9 +67,10 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   std::vector<hardware_interface::JointHandle>  joint_handle;
   
   // Load MATLAB trajectory
+  std::string filename = "ArmSwing"; //"ArmSwing", "Hexagon_fast"
 
-  // std::string path = "../rospackages/catkin_ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/";
-   std::string path = "../ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/";
+  std::string path = "../rospackages/catkin_ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/" + filename + "/";
+   //std::string path = "../ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/" + filename + "/";
 
   Eigen::MatrixXd X       = load_csv<Eigen::MatrixXd>(path,            "x.csv");
   Eigen::MatrixXd dX      = load_csv<Eigen::MatrixXd>(path,           "dx.csv");
@@ -80,6 +81,8 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   Eigen::MatrixXd q_null  = load_csv<Eigen::MatrixXd>(path,       "q_null.csv");
   Eigen::MatrixXd ts      = load_csv<Eigen::MatrixXd>(path,           "ts.csv");
   Eigen::MatrixXd gripper = load_csv<Eigen::MatrixXd>(path, "gripperTasks.csv");
+  Eigen::MatrixXd K_mat   = load_csv<Eigen::MatrixXd>(path,          "K_p.csv");  // check if they are included in trajectory folder
+  Eigen::MatrixXd D_mat   = load_csv<Eigen::MatrixXd>(path,        "D_eta.csv");
   
   double i        = 0;
   double mytime   = 0;
@@ -97,7 +100,6 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   Eigen::Matrix<double, 6, 1> error;
   Eigen::Matrix<double, 6, 1> derror;
   Eigen::Matrix<double, 6, 1> dderror;
-  // for quaternion error
   Eigen::Vector3d quat_d;
   Eigen::Vector3d quat_c;
 
@@ -147,6 +149,19 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   Eigen::Quaterniond orientation_d_target;
   Eigen::Vector3d    omega_d;
   Eigen::Vector3d    domega_d;
+  
+  //External Load (Alu block standing upright)
+  double mass_load = 0.991; // kg
+  double width     = 0.285; // m
+  double height    = 0.100; // m
+  double depth     = 0.012; // m
+  std::array<double, 9> inertia_load      = {mass_load/12 * (pow(depth, 2) + pow(height, 2)), 0, 0,
+                                             0, mass_load/12 * (pow(width, 2) + pow(height, 2)), 0,
+                                             0, 0, mass_load/12 * (pow(width, 2) + pow(depth, 2))};
+  std::array<double, 3> center_of_gravity = {0, 0, 0.135};
+  
+  Eigen::Matrix<double, 6, 1> external_load;
+  double m = 0;
 
   const double delta_tau_max_{1.0};  
   int j = 0;

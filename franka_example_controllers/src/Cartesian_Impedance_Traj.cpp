@@ -81,7 +81,6 @@ bool CartesianImpedanceTrajectory::init(hardware_interface::RobotHW* robot_hw, r
     K_d.diagonal() <<  40,  40,  40, 1.5, 1.5, 0.1;
     
     // Factorization Damping Desgin
-    K_p1 << K_p.sqrt();
     D_eta.diagonal() << 0.3, 0.3, 0.3, 0.4, 0.4, 0.4;
     
     C_hat.setZero();
@@ -92,6 +91,8 @@ bool CartesianImpedanceTrajectory::init(hardware_interface::RobotHW* robot_hw, r
     K_N << K_N * 15;
     D_N << D_N * sqrt(K_N(0,0));  
     I.setIdentity();
+    
+    external_load.setZero();
     
     notFirstRun = false;
     
@@ -197,17 +198,17 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
         domega_d               <<  domega(i,0),  domega(i,1),  domega(i,2);
         q_nullspace            <<  q_null(i,0),  q_null(i,1),  q_null(i,2),  q_null(i,3),  q_null(i,4),  q_null(i,5),  q_null(i,6); 
         gripper_command        << gripper(i,0), gripper(i,1), gripper(i,2), gripper(i,3), gripper(i,4);
+        K_p.diagonal()         <<   K_mat(i,0),   K_mat(i,1),   K_mat(i,2),   K_mat(i,3),   K_mat(i,4),   K_mat(i,5);
+        D_eta.diagonal()       <<   D_mat(i,0),   D_mat(i,1),   D_mat(i,2),   D_mat(i,3),   D_mat(i,4),   D_mat(i,5);
         
         if (mytime >= i * ts(0,0) + T && mytime >= ts(0,0) + T && i < X.rows() - 1) {
             i++;
             
             if (gripper_command(0) == 1){
                 GripperMove(gripper_command(1), gripper_command(2));
-                std::cout<<"Move command"<<std::endl;
             }
             if (gripper_command(0) == 2){
                 GripperGrasp(gripper_command(1), gripper_command(2), gripper_command(3),gripper_command(4));
-                std::cout<<"Grasp command"<<std::endl;
             }
         } 
     }
@@ -247,6 +248,7 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
     Lambda         << (jacobian * mass_inv * jacobian.transpose()).inverse();
     
     // Find best damping matrix: Factorization Damping Design
+    K_p1           << K_p.sqrt();
     A              << Lambda.sqrt();
     K_d            << A * D_eta * K_p1 + K_p1 * D_eta * A;
     
@@ -254,9 +256,9 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
         C_hat      << 0.5 * (Lambda - Lambda_prev) / period.toSec();
     } 
     
-    F_tau          << Lambda * ddx - K_d * derror - K_p * error - C_hat * derror - Lambda * djacobian_filtered * dq;
+    F_tau          << Lambda * ddx - K_d * derror - K_p * error - C_hat * derror - Lambda * djacobian_filtered * dq - external_load;
     
-    //     F_tau <<   -(K_d * derror + K_p * error);
+    //     F_tau <<   -(K_d * derror + K_p * error) - external_load;
     tau_task       << jacobian.transpose() * F_tau;
     
 //     nullspace PD control
@@ -301,7 +303,7 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
 //    std::cout << "ORIENTATION ERROR in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl<<std::endl;
    
     // STREAM DATA
-    if (j >= 100) {
+    if (false && j >= 100) {
         std::cout << curr_position.transpose()<<std::endl;
         std::cout << position_d.transpose()<<std::endl;
         std::cout << curr_orientation.coeffs().transpose()<<std::endl;
@@ -313,10 +315,10 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
     j++;
 }
 
-void CartesianImpedanceTrajectory::stopping(const ros::Time& /*time*/) {
-    //std::cout<<"Stopping"<<std::endl;
-    GripperMove(0.07, 0.01);
-}
+// void CartesianImpedanceTrajectory::stopping(const ros::Time& /*time*/) {
+//     //std::cout<<"Stopping"<<std::endl;
+//     GripperMove(0.07, 0.01);
+// }
 
 Eigen::Matrix<double, 7, 1> CartesianImpedanceTrajectory::saturateTorqueRate(const Eigen::Matrix<double, 7, 1>& tau_d_calculated,
     const Eigen::Matrix<double, 7, 1>& tau_J_d) {
@@ -352,6 +354,18 @@ void CartesianImpedanceTrajectory::GripperGrasp(double width, double speed, int 
     grasp_goal.epsilon.inner = epsilon;
     grasp_goal.epsilon.outer = epsilon;
     grasp1.sendGoal(grasp_goal);
+}
+
+void CartesianImpedanceTrajectory::SetLoad(double mass_new, double mass_old, std::array<double, 3> vec2CoG ,double time, double t){
+    
+    if (m <= 1 && time < t && time > 0.002) {
+        m             = 10 / pow(t, 3) * pow(time, 3) - 15 / pow(t, 4) * pow(time, 4) + 6 / pow(t, 5) * pow(time, 5);
+        double F_g    = -9.81 * (mass_old + m * (mass_new - mass_old));
+        external_load << 0, 0, F_g, vec2CoG[1] * F_g, - vec2CoG[0] * F_g, 0;
+    }
+    else {
+        m = 0;
+    }
 }
 
 }  // namespace franka_example_controllers

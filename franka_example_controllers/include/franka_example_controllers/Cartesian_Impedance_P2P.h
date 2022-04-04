@@ -3,7 +3,6 @@
 
 #include <cmath>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <vector>
 
@@ -35,11 +34,12 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
  private:
   // Saturation
   Eigen::Matrix<double, 7, 1> saturateTorqueRate(const Eigen::Matrix<double, 7, 1>& tau_d_calculated,const Eigen::Matrix<double, 7, 1>& tau_J_d);
-  void P2PMovement(const Eigen::Vector3d& target_position, const Eigen::Vector3d& target_angles, const Eigen::Vector3d& position_start, double time, double T);
+  void P2PMovement(const Eigen::Vector3d& target_position, const Eigen::Vector3d& target_angles, double time, double T);
   void Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input,  const Eigen::MatrixXd& input_prev, Eigen::MatrixXd& y);
   void GripperMove(double width, double speed); 
   void GripperGrasp(double width, double speed, int force, double epsilon);
   void SetLoad(double mass_old, double mass_new, std::array<double, 3> vec2CoG, double time, double t);
+  void AdjustImpedance(const Eigen::Matrix<double, 6, 6>& K_p_target, const Eigen::Matrix<double, 6, 6>& D_eta_target, double a);
 
   std::unique_ptr<franka_hw::FrankaStateHandle> state_handle;
   std::unique_ptr<franka_hw::FrankaModelHandle> model_handle;
@@ -48,7 +48,6 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   double mytime   = 0;
   int waypoint    = 1;
   int GripperTask = 1;
-  int j = 0;
     
   //     External Load (Alu block standing upright)
   double mass_load = 0.991; // kg
@@ -58,20 +57,24 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   std::array<double, 9> inertia_load      = {mass_load/12 * (pow(depth, 2) + pow(height, 2)), 0, 0,
                                              0, mass_load/12 * (pow(width, 2) + pow(height, 2)), 0,
                                              0, 0, mass_load/12 * (pow(width, 2) + pow(depth, 2))};
-  std::array<double, 3> center_of_gravity = {0.1, 0.1, 0.135};
+  std::array<double, 3> center_of_gravity = {0, 0, 0.135};
   
-  // Damping Desgin
-  Eigen::Matrix<double, 6, 6> D_eta;
-  Eigen::Matrix<double, 6, 6> K_p1;
-  Eigen::Matrix<double, 6, 6> A;
   Eigen::Matrix<double, 6, 1> external_load;
   double m = 0;
+  
+    // for quintic trajectory
+  double T;
+  double a3;
+  double a4;
+  double a5;
+  double s   = 0; 
+  double ds  = 0; 
+  double dds = 0; 
   
   // Errors
   Eigen::Matrix<double, 6, 1> error;
   Eigen::Matrix<double, 6, 1> derror;
   Eigen::Matrix<double, 6, 1> dderror;
-  // for quaternion error
   Eigen::Vector3d quat_d;
   Eigen::Vector3d quat_c;
 
@@ -83,6 +86,7 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   Eigen::Matrix<double, 6, 6> C_hat;
   
   Eigen::Matrix<double, 6, 6> K_p;
+  Eigen::Matrix<double, 6, 6> K_p_target;
   Eigen::Matrix<double, 6, 6> K_d;
   Eigen::Matrix<double, 7, 7> K_N;
   Eigen::Matrix<double, 7, 7> D_N;
@@ -98,14 +102,11 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   Eigen::Matrix<double, 6, 7> jacobian_prev;
   Eigen::Matrix<double, 7, 1> tau_d_saturated;
   
-  // for quintic trajectory
-  double T;
-  double a3;
-  double a4;
-  double a5;
-  double s   = 0; 
-  double ds  = 0; 
-  double dds = 0; 
+    // Damping Desgin
+  Eigen::Matrix<double, 6, 6> D_eta;
+  Eigen::Matrix<double, 6, 6> D_eta_target;
+  Eigen::Matrix<double, 6, 6> K_p1;
+  Eigen::Matrix<double, 6, 6> A;
   
   Eigen::Vector3d    curr_position;
   Eigen::Matrix<double, 6, 1> curr_velocity;
@@ -124,7 +125,8 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   Eigen::Vector3d    omega_d;
   Eigen::Vector3d    domega_d;
   
-  const double delta_tau_max_{1.0};   
+  const double delta_tau_max_{1.0};  
+  int j = 0;
 };
 
 }  // namespace franka_example_controllers
