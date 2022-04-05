@@ -83,6 +83,7 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   Eigen::MatrixXd gripper = load_csv<Eigen::MatrixXd>(path, "gripperTasks.csv");
   Eigen::MatrixXd K_mat   = load_csv<Eigen::MatrixXd>(path,          "K_p.csv");  // check if they are included in trajectory folder
   Eigen::MatrixXd D_mat   = load_csv<Eigen::MatrixXd>(path,        "D_eta.csv");
+  Eigen::MatrixXd m_load  = load_csv<Eigen::MatrixXd>(path,       "m_load.csv");
   
   double i        = 0;
   double mytime   = 0;
