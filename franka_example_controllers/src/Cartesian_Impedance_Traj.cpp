@@ -200,7 +200,7 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
         gripper_command        << gripper(i,0), gripper(i,1), gripper(i,2), gripper(i,3), gripper(i,4);
         K_p.diagonal()         <<   K_mat(i,0),   K_mat(i,1),   K_mat(i,2),   K_mat(i,3),   K_mat(i,4),   K_mat(i,5);
         D_eta.diagonal()       <<   D_mat(i,0),   D_mat(i,1),   D_mat(i,2),   D_mat(i,3),   D_mat(i,4),   D_mat(i,5);
-        external_load          <<   0, 0, -9.81 * m_load(i), 0, 0, 0;  
+        external_load          << ExtLoad(i,0), ExtLoad(i,1), ExtLoad(i,2), ExtLoad(i,3), ExtLoad(i,4), ExtLoad(i,5);
         
         if (mytime >= i * ts(0,0) + T && mytime >= ts(0,0) + T && i < X.rows() - 1) {
             i++;
@@ -304,13 +304,16 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
 //    std::cout << "ORIENTATION ERROR in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl<<std::endl;
    
     // STREAM DATA
-    if (false && j >= 100) {
+    if (true && j >= 100) {
         std::cout << curr_position.transpose()<<std::endl;
         std::cout << position_d.transpose()<<std::endl;
         std::cout << curr_orientation.coeffs().transpose()<<std::endl;
         std::cout << orientation_d.coeffs().transpose()<<std::endl;
         std::cout << error.head(3).transpose() * 1000 <<std::endl;
-        std::cout << error_angles.transpose() * 180/M_PI<<std::endl;
+        std::cout << error_angles.transpose() * 180/M_PI<<std::endl;\
+        std::cout << (jacobian.transpose() * (-(K_d * derror + K_p * error) - external_load)).transpose() <<std::endl;
+        std::cout << tau_task.transpose() <<std::endl;
+        std::cout << tau_d.transpose() <<std::endl;
         j = 0;
     }
     j++;

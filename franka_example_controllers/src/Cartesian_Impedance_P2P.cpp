@@ -205,7 +205,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         }
     } 
     else if(waypoint == 4) { // Hold object while moving
-        position_d_target << 0.5, 0, 0.2;
+        position_d_target << 0.5, 0, 0.4;
         angles_d_target   <<   0, 0,   0;
         P2PMovement(position_d_target, angles_d_target, mytime, 5);
         SetLoad(mass_load, 0, center_of_gravity, mytime, 1);
@@ -340,13 +340,16 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
  // std::cout <<external_load<<std::endl<<std::endl;
    
    // STREAM DATA
-    if (false && j >= 100) {
+    if (true && j >= 100) {
         std::cout << curr_position.transpose()<<std::endl;
         std::cout << position_d.transpose()<<std::endl;
         std::cout << curr_orientation.coeffs().transpose()<<std::endl;
         std::cout << orientation_d.coeffs().transpose()<<std::endl;
         std::cout << error.head(3).transpose() * 1000 <<std::endl;
         std::cout << error_angles.transpose() * 180/M_PI<<std::endl;
+        std::cout << (jacobian.transpose() * (-(K_d * derror + K_p * error) - external_load)).transpose() <<std::endl;
+        std::cout << tau_task.transpose() <<std::endl;
+        std::cout << tau_d.transpose() <<std::endl;
         j = 0;
     }
     j++;
@@ -431,7 +434,7 @@ void CartesianImpedanceP2P::SetLoad(double mass_new, double mass_old, std::array
     if (m <= 1 && time < t && time > 0.002) {
         m             = 10 / pow(t, 3) * pow(time, 3) - 15 / pow(t, 4) * pow(time, 4) + 6 / pow(t, 5) * pow(time, 5);
         double F_g    = -9.81 * (mass_old + m * (mass_new - mass_old));
-        external_load << 0, 0, F_g, vec2CoG[1] * F_g, - vec2CoG[0] * F_g, 0;
+        external_load << 0, 0, F_g, /*vec2CoG[1] * F_g*/ 0, /*- vec2CoG[0] * F_g*/ 0, 0;
     }
     else {
         m = 0;
