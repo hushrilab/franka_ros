@@ -208,7 +208,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         position_d_target << 0.5, 0, 0.4;
         angles_d_target   <<   0, 0,   0;
         P2PMovement(position_d_target, angles_d_target, mytime, 5);
-        SetLoad(mass_load, 0, center_of_gravity, mytime, 1);
+        mass_new = mass_load;
         
         K_p_target.diagonal() << 500, 500, 500,  150,  150,  150;
         D_eta_target.diagonal() << 0.3, 0.3, 0.3, 0.7, 0.7, 0.7;
@@ -227,7 +227,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         if(GripperTask == 5) {
             GripperMove(0.06, 0.03);
         }    
-        SetLoad(0, mass_load, center_of_gravity, mytime, 1); 
+        mass_new = 0; 
     }
     else if(waypoint == 7) { // Repeat motion
         waypoint    = 1;
@@ -253,6 +253,11 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         orientation_d  = curr_orientation;
         ROS_ERROR_STREAM("CartesianImpedanceP2P: No waypoint defined!");
     }
+    // EXTERNAL MASS
+    mass          =  mass * (1 - 0.001) + 0.001 * mass_new;
+    lever         << TransformationMatrix.rotation() * vec2CoG;
+    external_load << 0, 0, mass * -9.81, lever(1) * mass * -9.81, - lever(0) * mass * -9.81, 0;
+    
 ///////////////////////////////////// COMPUTE ERRORS //////////////////////////////////////////////////////
     
     // POSITION ERROR
@@ -427,19 +432,7 @@ void CartesianImpedanceP2P::GripperGrasp(double width, double speed, int force, 
     grasp_goal.epsilon.outer = epsilon;
     grasp.sendGoal(grasp_goal);
     GripperTask++;
-}
-
-void CartesianImpedanceP2P::SetLoad(double mass_new, double mass_old, std::array<double, 3> vec2CoG ,double time, double t){
-    
-    if (m <= 1 && time < t && time > 0.002) {
-        m             = 10 / pow(t, 3) * pow(time, 3) - 15 / pow(t, 4) * pow(time, 4) + 6 / pow(t, 5) * pow(time, 5);
-        double F_g    = -9.81 * (mass_old + m * (mass_new - mass_old));
-        external_load << 0, 0, F_g, /*vec2CoG[1] * F_g*/ 0, /*- vec2CoG[0] * F_g*/ 0, 0;
-    }
-    else {
-        m = 0;
-    }
-}
+}  
 
 void CartesianImpedanceP2P::AdjustImpedance(const Eigen::Matrix<double, 6, 6>& K_p_target, const Eigen::Matrix<double, 6, 6>& D_eta_target, double a){
     
