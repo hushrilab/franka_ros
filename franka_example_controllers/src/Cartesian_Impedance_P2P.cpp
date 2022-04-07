@@ -195,7 +195,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         }
         K_p_target.diagonal() << 1500, 1500, 1500,  150,  150,  150;
         D_eta_target.diagonal() << 0.7, 0.7, 0.7, 0.7, 0.7, 0.7;
-        AdjustImpedance(K_p_target, D_eta_target, 0.005);
+        AdjustImpedance(K_p_target, D_eta_target, 0.001);
     }   
     else if(waypoint == 3) { // Grasp object here
         position_d_target << 0.4, 0, 0.07;
@@ -257,7 +257,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     }
     
     // EXTERNAL MASS
-    load          =  load * (1 - 0.008) + 0.008 * load_new;
+    load          =  load * (1 - 0.001) + 0.001 * load_new;
     lever         << TransformationMatrix.rotation() * vec2CoG;
     external_load << 0, 0, load * -9.81, lever(1) * load * -9.81, - lever(0) * load * -9.81, 0;
     

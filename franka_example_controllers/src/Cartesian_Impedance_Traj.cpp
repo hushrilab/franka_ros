@@ -132,6 +132,8 @@ void CartesianImpedanceTrajectory::starting(const ros::Time& /*time*/) {
     q_nullspace_init     <<  q_initial;
     jacobian_prev        <<  jacobian;
     djacobian.setZero(); 
+    K_p.diagonal()         <<   K_mat(0,0),   K_mat(0,1),   K_mat(0,2),   K_mat(0,3),   K_mat(0,4),   K_mat(0,5);
+    D_eta.diagonal()       <<   D_mat(0,0),   D_mat(0,1),   D_mat(0,2),   D_mat(0,3),   D_mat(0,4),   D_mat(0,5);
 
 }
 

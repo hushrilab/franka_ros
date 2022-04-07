@@ -67,10 +67,10 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   std::vector<hardware_interface::JointHandle>  joint_handle;
   
   // Load MATLAB trajectory
-  std::string filename = "ArmSwing"; //"ArmSwing", "Hexagon_fast"
+  std::string filename = "Hexagon"; //"ArmSwing", "Hexagon_fast"
 
-  std::string path = "../rospackages/catkin_ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/" + filename + "/";
-   //std::string path = "../ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/" + filename + "/";
+ // std::string path = "../rospackages/catkin_ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/" + filename + "/";
+  std::string path = "../ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/" + filename + "/";
 
   Eigen::MatrixXd X       = load_csv<Eigen::MatrixXd>(path,            "x.csv");
   Eigen::MatrixXd dX      = load_csv<Eigen::MatrixXd>(path,           "dx.csv");
