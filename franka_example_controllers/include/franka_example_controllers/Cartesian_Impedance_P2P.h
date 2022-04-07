@@ -38,7 +38,7 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   void Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input,  const Eigen::MatrixXd& input_prev, Eigen::MatrixXd& y);
   void GripperMove(double width, double speed); 
   void GripperGrasp(double width, double speed, int force, double epsilon);
-  void SetLoad(double mass_old, double mass_new, std::array<double, 3> vec2CoG, double time, double t);
+  //void SetLoad(double mass_old, double mass_new, std::array<double, 3> vec2CoG, double time, double t);
   void AdjustImpedance(const Eigen::Matrix<double, 6, 6>& K_p_target, const Eigen::Matrix<double, 6, 6>& D_eta_target, double a);
 
   std::unique_ptr<franka_hw::FrankaStateHandle> state_handle;
@@ -50,16 +50,13 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   int GripperTask = 1;
     
   //     External Load (Alu block standing upright)
-  double mass_load = 0.991; // kg
-  double width     = 0.285; // m
-  double height    = 0.100; // m
-  double depth     = 0.012; // m
-  Eigen::Vector3d vec2CoG(0, 0, -0.135);
+  double mass_load;
+  Eigen::Vector3d vec2CoG;
   
   Eigen::Matrix<double, 6, 1> external_load;
   Eigen::Vector3d lever;
-  double mass     = 0;
-  double mass_new = 0;
+  double load     = 0;
+  double load_new = 0;
   
     // for quintic trajectory
   double T;

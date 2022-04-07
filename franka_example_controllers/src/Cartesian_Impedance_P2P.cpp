@@ -101,6 +101,8 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw, ros::Nod
     I.setIdentity();
 
     external_load.setZero();
+    vec2CoG   << 0.1, 0, -0.135;
+    mass_load = 0.991;
     
     notFirstRun = false;
     return true;
@@ -206,9 +208,9 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     } 
     else if(waypoint == 4) { // Hold object while moving
         position_d_target << 0.5, 0, 0.4;
-        angles_d_target   <<   0, 0,   0;
+        angles_d_target   <<   0, 20,   0;
         P2PMovement(position_d_target, angles_d_target, mytime, 5);
-        mass_new = mass_load;
+        load_new = mass_load;
         
         K_p_target.diagonal() << 500, 500, 500,  150,  150,  150;
         D_eta_target.diagonal() << 0.3, 0.3, 0.3, 0.7, 0.7, 0.7;
@@ -227,7 +229,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         if(GripperTask == 5) {
             GripperMove(0.06, 0.03);
         }    
-        mass_new = 0; 
+        load_new = 0; 
     }
     else if(waypoint == 7) { // Repeat motion
         waypoint    = 1;
@@ -253,10 +255,11 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         orientation_d  = curr_orientation;
         ROS_ERROR_STREAM("CartesianImpedanceP2P: No waypoint defined!");
     }
+    
     // EXTERNAL MASS
-    mass          =  mass * (1 - 0.001) + 0.001 * mass_new;
+    load          =  load * (1 - 0.008) + 0.008 * load_new;
     lever         << TransformationMatrix.rotation() * vec2CoG;
-    external_load << 0, 0, mass * -9.81, lever(1) * mass * -9.81, - lever(0) * mass * -9.81, 0;
+    external_load << 0, 0, load * -9.81, lever(1) * load * -9.81, - lever(0) * load * -9.81, 0;
     
 ///////////////////////////////////// COMPUTE ERRORS //////////////////////////////////////////////////////
     
@@ -345,7 +348,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
  // std::cout <<external_load<<std::endl<<std::endl;
    
    // STREAM DATA
-    if (true && j >= 100) {
+    if (false && j >= 100) {
         std::cout << curr_position.transpose()<<std::endl;
         std::cout << position_d.transpose()<<std::endl;
         std::cout << curr_orientation.coeffs().transpose()<<std::endl;
