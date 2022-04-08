@@ -129,6 +129,7 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   Eigen::Matrix<double, 6, 7> jacobian_prev;
   Eigen::Matrix<double, 7, 1> tau_d_saturated;
   Eigen::Matrix<double, 5, 1> gripper_command;
+  Eigen::Matrix<double, 6, 1> external_load;
   
     // Damping Desgin
   Eigen::Matrix<double, 6, 6> D_eta;
@@ -150,19 +151,6 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   Eigen::Quaterniond orientation_d_target;
   Eigen::Vector3d    omega_d;
   Eigen::Vector3d    domega_d;
-  
-  //External Load (Alu block standing upright)
-  double mass_load = 0.991; // kg
-  double width     = 0.285; // m
-  double height    = 0.100; // m
-  double depth     = 0.012; // m
-  std::array<double, 9> inertia_load      = {mass_load/12 * (pow(depth, 2) + pow(height, 2)), 0, 0,
-                                             0, mass_load/12 * (pow(width, 2) + pow(height, 2)), 0,
-                                             0, 0, mass_load/12 * (pow(width, 2) + pow(depth, 2))};
-  std::array<double, 3> center_of_gravity = {0, 0, 0.135};
-  
-  Eigen::Matrix<double, 6, 1> external_load;
-  double m = 0;
 
   const double delta_tau_max_{1.0};  
   int j = 0;

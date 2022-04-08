@@ -321,11 +321,6 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
     j++;
 }
 
-// void CartesianImpedanceTrajectory::stopping(const ros::Time& /*time*/) {
-//     //std::cout<<"Stopping"<<std::endl;
-//     GripperMove(0.07, 0.01);
-// }
-
 Eigen::Matrix<double, 7, 1> CartesianImpedanceTrajectory::saturateTorqueRate(const Eigen::Matrix<double, 7, 1>& tau_d_calculated,
     const Eigen::Matrix<double, 7, 1>& tau_J_d) {
     

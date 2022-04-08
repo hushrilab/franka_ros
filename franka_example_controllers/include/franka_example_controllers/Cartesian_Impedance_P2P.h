@@ -29,7 +29,6 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   bool init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& node_handle) override;
   void starting(const ros::Time&) override;
   void update(const ros::Time&, const ros::Duration& period) override;
-//   void stopping(const ros::Time&) override;
 
  private:
   // Saturation
@@ -38,7 +37,7 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   void Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input,  const Eigen::MatrixXd& input_prev, Eigen::MatrixXd& y);
   void GripperMove(double width, double speed); 
   void GripperGrasp(double width, double speed, int force, double epsilon);
-  //void SetLoad(double mass_old, double mass_new, std::array<double, 3> vec2CoG, double time, double t);
+  void SetLoad(double mass_old, double mass_new, double time, double t);
   void AdjustImpedance(const Eigen::Matrix<double, 6, 6>& K_p_target, const Eigen::Matrix<double, 6, 6>& D_eta_target, double a);
 
   std::unique_ptr<franka_hw::FrankaStateHandle> state_handle;
@@ -55,8 +54,8 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   
   Eigen::Matrix<double, 6, 1> external_load;
   Eigen::Vector3d lever;
-  double load     = 0;
-  double load_new = 0;
+  double load = 0;
+  double m    = 0;
   
     // for quintic trajectory
   double T;

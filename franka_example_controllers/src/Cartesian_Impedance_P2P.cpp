@@ -210,7 +210,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         position_d_target << 0.5, 0, 0.4;
         angles_d_target   <<   0, 20,   0;
         P2PMovement(position_d_target, angles_d_target, mytime, 5);
-        load_new = mass_load;
+        SetLoad(mass_load, 0, mytime, 1);
         
         K_p_target.diagonal() << 500, 500, 500,  150,  150,  150;
         D_eta_target.diagonal() << 0.3, 0.3, 0.3, 0.7, 0.7, 0.7;
@@ -220,6 +220,10 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         position_d_target << 0.4, 0, 0.07;
         angles_d_target   <<   0, 0,   0;
         P2PMovement(position_d_target, angles_d_target, mytime, 5);
+        
+        K_p_target.diagonal() << 1500, 1500, 1500,  150,  150,  150;
+        D_eta_target.diagonal() << 0.7, 0.7, 0.7, 0.7, 0.7, 0.7;
+        AdjustImpedance(K_p_target, D_eta_target, 0.001);
     } 
     else if(waypoint == 6) { // Drop object
         position_d_target << 0.4, 0, 0.07;
@@ -229,7 +233,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         if(GripperTask == 5) {
             GripperMove(0.06, 0.03);
         }    
-        load_new = 0; 
+        SetLoad(0, mass_load, mytime, 1);
     }
     else if(waypoint == 7) { // Repeat motion
         waypoint    = 1;
@@ -257,9 +261,9 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     }
     
     // EXTERNAL MASS
-    load          =  load * (1 - 0.001) + 0.001 * load_new;
     lever         << TransformationMatrix.rotation() * vec2CoG;
-    external_load << 0, 0, load * -9.81, lever(1) * load * -9.81, - lever(0) * load * -9.81, 0;
+    external_load << 0, 0, load, lever(1) * load, - lever(0) * load, 0;
+    std::cout<<external_load.transpose()<<std::endl<<std::endl;
     
 ///////////////////////////////////// COMPUTE ERRORS //////////////////////////////////////////////////////
     
@@ -285,7 +289,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     ddx.tail(3)    << domega_d;    
     
 ////////////////////////////////////////// CONTROLLER //////////////////////////////////////////////////////
-//////////     Soruce: AAlin Albu-Schäffer: Cartesian Impedance Control of Redundant Robots:       /////////
+//////////     Soruce: Alin Albu-Schäffer: Cartesian Impedance Control of Redundant Robots:       /////////
 //////////////////          Recent Results with the DLR-Light-Weight-Arms, DLR    //////////////////////////
 
     Lambda         << (jacobian * mass_inv * jacobian.transpose()).inverse();
@@ -344,8 +348,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     }
     
    // std::cout << "Position Error in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl<<std::endl; 
-   // std::cout << "ORIENTATION Error in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl<<std::endl;
- // std::cout <<external_load<<std::endl<<std::endl;
+//    std::cout << "ORIENTATION Error in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl<<std::endl;
    
    // STREAM DATA
     if (false && j >= 100) {
@@ -362,9 +365,6 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     }
     j++;
 }
-// void CartesianImpedanceP2P::stopping(const ros::Time& /*time*/) {
-//     std::cout<<">>>>>>>>>>>>>>>>>>>>>>>>>Stop<<<<<<<<<<<<<<<<<<<<<<<"<<std::endl;
-// }
 
 void CartesianImpedanceP2P::P2PMovement(const Eigen::Vector3d& target_position, const Eigen::Vector3d& target_angles, double time, double T){
     
@@ -421,7 +421,7 @@ void CartesianImpedanceP2P::GripperMove(double width, double speed) {
     franka_gripper::MoveGoal  move_goal;
     move_goal.width = width;
     move_goal.speed = speed;
-    move.sendGoal(move_goal);
+    move.sendGoal(move_goal); 
     GripperTask++;
 }
 
@@ -436,6 +436,17 @@ void CartesianImpedanceP2P::GripperGrasp(double width, double speed, int force, 
     grasp.sendGoal(grasp_goal);
     GripperTask++;
 }  
+
+void CartesianImpedanceP2P::SetLoad(double mass_new, double mass_old, double time, double t){
+    
+    if (m <= 1 && time < t && time > 0.002) {
+        m    = 10 / pow(t, 3) * pow(time, 3) - 15 / pow(t, 4) * pow(time, 4) + 6 / pow(t, 5) * pow(time, 5);
+        load = -9.81 * (mass_old + m * (mass_new - mass_old));
+    }
+    else {
+        m = 0;
+    }
+}
 
 void CartesianImpedanceP2P::AdjustImpedance(const Eigen::Matrix<double, 6, 6>& K_p_target, const Eigen::Matrix<double, 6, 6>& D_eta_target, double a){
     
