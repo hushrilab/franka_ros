@@ -330,7 +330,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     Error_quats.x() = error(3);
     Error_quats.y() = error(4);
     Error_quats.z() = error(5);
-    Error_quats.w() = 1 - error(3) - error(4) - error(5);
+    Error_quats.w() = sqrt(1 - pow(error(3), 2) - pow(error(4), 2) - pow(error(5), 2));
     Eigen::Vector3d error_angles;
     error_angles = Error_quats.toRotationMatrix().eulerAngles(0, 1, 2);
     
