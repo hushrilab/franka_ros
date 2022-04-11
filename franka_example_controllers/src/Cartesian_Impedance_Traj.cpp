@@ -306,7 +306,7 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
 //    std::cout << "ORIENTATION ERROR in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl<<std::endl;
    
     // STREAM DATA
-    if (true && j >= 100) {
+    if (false && j >= 100) {
         std::cout << curr_position.transpose()<<std::endl;
         std::cout << position_d.transpose()<<std::endl;
         std::cout << curr_orientation.coeffs().transpose()<<std::endl;
@@ -356,19 +356,6 @@ void CartesianImpedanceTrajectory::GripperGrasp(double width, double speed, int 
     grasp_goal.epsilon.outer = epsilon;
     grasp1.sendGoal(grasp_goal);
 }
-
-void CartesianImpedanceTrajectory::SetLoad(double mass_new, double mass_old, std::array<double, 3> vec2CoG ,double time, double t){
-    
-    if (m <= 1 && time < t && time > 0.002) {
-        m             = 10 / pow(t, 3) * pow(time, 3) - 15 / pow(t, 4) * pow(time, 4) + 6 / pow(t, 5) * pow(time, 5);
-        double F_g    = -9.81 * (mass_old + m * (mass_new - mass_old));
-        external_load << 0, 0, F_g, vec2CoG[1] * F_g, - vec2CoG[0] * F_g, 0;
-    }
-    else {
-        m = 0;
-    }
-}
-
 }  // namespace franka_example_controllers
 
 PLUGINLIB_EXPORT_CLASS(franka_example_controllers::CartesianImpedanceTrajectory,
