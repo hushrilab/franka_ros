@@ -263,7 +263,6 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     // EXTERNAL MASS
     lever         << TransformationMatrix.rotation() * vec2CoG;
     external_load << 0, 0, load, lever(1) * load, - lever(0) * load, 0;
-    std::cout<<external_load.transpose()<<std::endl<<std::endl;
     
 ///////////////////////////////////// COMPUTE ERRORS //////////////////////////////////////////////////////
     
