@@ -67,9 +67,9 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   std::vector<hardware_interface::JointHandle>  joint_handle;
   
   // Load MATLAB trajectory
-  std::string filename = "BookSwing"; //"ArmSwing", "Hexagon", "BookSwing"
+  std::string filename = "BookTrajectory"; //"ArmSwing", "Hexagon", "BookTrajectory"
 
- // std::string path = "../rospackages/catkin_ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/" + filename + "/";
+  //std::string path = "../rospackages/catkin_ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/" + filename + "/";
   std::string path = "../ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/" + filename + "/";
 
   Eigen::MatrixXd X       = load_csv<Eigen::MatrixXd>(path,            "x.csv");
@@ -129,7 +129,9 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   Eigen::Matrix<double, 6, 7> jacobian_prev;
   Eigen::Matrix<double, 7, 1> tau_d_saturated;
   Eigen::Matrix<double, 5, 1> gripper_command;
+  Eigen::Matrix<double, 4, 1> load;
   Eigen::Matrix<double, 6, 1> external_load;
+  Eigen::Vector3d lever;
   
     // Damping Desgin
   Eigen::Matrix<double, 6, 6> D_eta;

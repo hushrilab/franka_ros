@@ -202,7 +202,7 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
         gripper_command        << gripper(i,0), gripper(i,1), gripper(i,2), gripper(i,3), gripper(i,4);
         K_p.diagonal()         <<   K_mat(i,0),   K_mat(i,1),   K_mat(i,2),   K_mat(i,3),   K_mat(i,4),   K_mat(i,5);
         D_eta.diagonal()       <<   D_mat(i,0),   D_mat(i,1),   D_mat(i,2),   D_mat(i,3),   D_mat(i,4),   D_mat(i,5);
-        external_load          << ExtLoad(i,0), ExtLoad(i,1), ExtLoad(i,2), ExtLoad(i,3), ExtLoad(i,4), ExtLoad(i,5);
+        load                   << ExtLoad(i,0), ExtLoad(i,1), ExtLoad(i,2), ExtLoad(i,3);
         
         if (mytime >= i * ts(0,0) + T && mytime >= ts(0,0) + T && i < X.rows() - 1) {
             i++;
@@ -220,6 +220,10 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
         i = 0;
         mytime = 0;
     } 
+    
+    // EXTERNAL MASS
+    lever         << TransformationMatrix.rotation() * load.tail(3);
+    external_load << 0, 0, load(0), lever(1) * load, - lever(0) * load, 0;
 
 /////////////////////////////////////////// COMPUTE ERRORS ///////////////////////////////////////////////////
     
@@ -284,29 +288,26 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
     jacobian_prev << jacobian;
     Lambda_prev   << Lambda;
     notFirstRun   =  true; 
-    
-    // PRINT ERRORS
-    Eigen::Quaterniond Error_quats;
-    Error_quats.x() = error(3);
-    Error_quats.y() = error(4);
-    Error_quats.z() = error(5);
-    Error_quats.w() = sqrt(1 - pow(error(3), 2) - pow(error(4), 2) - pow(error(5), 2));
-    Eigen::Vector3d error_angles;
-    error_angles = Error_quats.toRotationMatrix().eulerAngles(0, 1, 2);
-    
-    for(int j = 0; j < 3;j++){
-        if(error_angles(j) > M_PI/2){
-            error_angles(j) = error_angles(j) - M_PI;
-        }
-        if(error_angles(j) < -M_PI/2){
-            error_angles(j) = error_angles(j) + M_PI;
-        }
-    }
-//    std::cout << "POSITION ERROR in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl<<std::endl; 
-//    std::cout << "ORIENTATION ERROR in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl<<std::endl;
    
     // STREAM DATA
-    if (true && j >= 100) {
+    if (false && j >= 100) {
+        // PRINT ERRORS
+        Eigen::Quaterniond Error_quats;
+        Error_quats.x() = error(3);
+        Error_quats.y() = error(4);
+        Error_quats.z() = error(5);
+        Error_quats.w() = sqrt(1 - pow(error(3), 2) - pow(error(4), 2) - pow(error(5), 2));
+        Eigen::Vector3d error_angles;
+        error_angles = Error_quats.toRotationMatrix().eulerAngles(0, 1, 2);
+        
+        for(int j = 0; j < 3;j++){
+            if(error_angles(j) > M_PI/2){
+                error_angles(j) = error_angles(j) - M_PI;
+            }
+            if(error_angles(j) < -M_PI/2){
+                error_angles(j) = error_angles(j) + M_PI;
+            }
+        }
         std::cout << curr_position.transpose()<<std::endl;
         std::cout << position_d.transpose()<<std::endl;
         std::cout << curr_orientation.coeffs().transpose()<<std::endl;

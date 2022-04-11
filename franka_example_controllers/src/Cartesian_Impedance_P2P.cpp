@@ -328,35 +328,31 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     Lambda_prev   << Lambda;
     notFirstRun   =  true;
     
-    // PRINT ERRORS
-    Eigen::Quaterniond Error_quats;
-    Error_quats.x() = error(3);
-    Error_quats.y() = error(4);
-    Error_quats.z() = error(5);
-    Error_quats.w() = sqrt(1 - pow(error(3), 2) - pow(error(4), 2) - pow(error(5), 2));
-    Eigen::Vector3d error_angles;
-    error_angles = Error_quats.toRotationMatrix().eulerAngles(0, 1, 2);
-    
-    for(int j = 0; j < 3;j++){
-        if(error_angles(j) > M_PI/2){
-            error_angles(j) = error_angles(j) - M_PI;
+    // STREAM DATA
+    if (true && j >= 100) {
+        // PRINT ERRORS
+        Eigen::Quaterniond Error_quats;
+        Error_quats.x() = error(3);
+        Error_quats.y() = error(4);
+        Error_quats.z() = error(5);
+        Error_quats.w() = sqrt(1 - pow(error(3), 2) - pow(error(4), 2) - pow(error(5), 2));
+        Eigen::Vector3d error_angles;
+        error_angles = Error_quats.toRotationMatrix().eulerAngles(0, 1, 2);
+        
+        for(int j = 0; j < 3;j++){
+            if(error_angles(j) > M_PI/2){
+                error_angles(j) = error_angles(j) - M_PI;
+            }
+            if(error_angles(j) < -M_PI/2){
+                error_angles(j) = error_angles(j) + M_PI;
+            }
         }
-        if(error_angles(j) < -M_PI/2){
-            error_angles(j) = error_angles(j) + M_PI;
-        }
-    }
-    
-   // std::cout << "Position Error in [mm]:" <<std::endl<< error.head(3) * 1000 <<std::endl<<std::endl; 
-//    std::cout << "ORIENTATION Error in [deg]:" <<std::endl<< error_angles * 180/M_PI<<std::endl<<std::endl;
-   
-   // STREAM DATA
-    if (false && j >= 100) {
         std::cout << curr_position.transpose()<<std::endl;
         std::cout << position_d.transpose()<<std::endl;
         std::cout << curr_orientation.coeffs().transpose()<<std::endl;
         std::cout << orientation_d.coeffs().transpose()<<std::endl;
         std::cout << error.head(3).transpose() * 1000 <<std::endl;
-        std::cout << error_angles.transpose() * 180/M_PI<<std::endl;
+        std::cout << error_angles.transpose() * 180/M_PI<<std::endl;\
         std::cout << (jacobian.transpose() * (-(K_d * derror + K_p * error) - external_load)).transpose() <<std::endl;
         std::cout << tau_task.transpose() <<std::endl;
         std::cout << tau_d.transpose() <<std::endl;
@@ -439,7 +435,7 @@ void CartesianImpedanceP2P::GripperGrasp(double width, double speed, int force, 
 void CartesianImpedanceP2P::SetLoad(double mass_new, double mass_old, double time, double t){
     
     if (m <= 1 && time < t && time > 0.002) {
-        m    = 10 / pow(t, 3) * pow(time, 3) - 15 / pow(t, 4) * pow(time, 4) + 6 / pow(t, 5) * pow(time, 5);
+        m    =  10 / pow(t, 3) * pow(time, 3) - 15 / pow(t, 4) * pow(time, 4) + 6 / pow(t, 5) * pow(time, 5);
         load = -9.81 * (mass_old + m * (mass_new - mass_old));
     }
     else {
