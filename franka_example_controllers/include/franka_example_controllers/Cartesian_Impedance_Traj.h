@@ -69,8 +69,8 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   // Load MATLAB trajectory
   std::string filename = "BookTrajectory"; //"ArmSwing", "Hexagon", "BookTrajectory"
 
-  //std::string path = "../rospackages/catkin_ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/" + filename + "/";
-  std::string path = "../ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/" + filename + "/";
+  std::string path = "../rospackages/catkin_ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/" + filename + "/";
+  //std::string path = "../ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/" + filename + "/";
 
   Eigen::MatrixXd X       = load_csv<Eigen::MatrixXd>(path,            "x.csv");
   Eigen::MatrixXd dX      = load_csv<Eigen::MatrixXd>(path,           "dx.csv");

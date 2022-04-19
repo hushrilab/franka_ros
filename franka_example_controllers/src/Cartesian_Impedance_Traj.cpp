@@ -223,7 +223,7 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
     
     // EXTERNAL MASS
     lever         << TransformationMatrix.rotation() * load.tail(3);
-    external_load << 0, 0, load(0), lever(1) * load, - lever(0) * load, 0;
+    external_load << 0, 0, -9.81 * load(0), lever(1) * (-9.81) * load(0), - lever(0) * (-9.81) * load(0), 0;
 
 /////////////////////////////////////////// COMPUTE ERRORS ///////////////////////////////////////////////////
     
@@ -265,7 +265,6 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
     
     F_tau          << Lambda * ddx - K_d * derror - K_p * error - C_hat * derror - Lambda * djacobian_filtered * dq - external_load;
     
-    //     F_tau <<   -(K_d * derror + K_p * error) - external_load;
     tau_task       << jacobian.transpose() * F_tau;
     
 //     nullspace PD control

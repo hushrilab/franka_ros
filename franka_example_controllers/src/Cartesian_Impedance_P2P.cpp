@@ -101,7 +101,7 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw, ros::Nod
     I.setIdentity();
 
     external_load.setZero();
-    vec2CoG   << 0.1, 0, -0.135;
+    vec2CoG   << 0, 0, 0.135;
     mass_load = 0.991;
     
     notFirstRun = false;
@@ -304,7 +304,6 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     
     F_tau          << Lambda * ddx - K_d * derror - K_p * error - C_hat * derror - Lambda * djacobian_filtered * dq - external_load;
     
-//     F_tau          <<   -(K_d * derror + K_p * error) - external_load;
     tau_task       << jacobian.transpose() * F_tau;
     
 //     nullspace control
