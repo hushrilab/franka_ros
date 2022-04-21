@@ -78,17 +78,16 @@ bool CartesianImpedanceP2P::init(hardware_interface::RobotHW* robot_hw, ros::Nod
     //   For Impedance Controller
     K_p.diagonal() << 500, 500, 600,  30,  40,  12;
 
-// Soft Position, stiff orientation
- //   K_p.diagonal() << 300, 300, 300,  140,  160,  115;
+    // Soft Position, stiff orientation
+    // K_p.diagonal() << 300, 300, 300,  140,  160,  115;
 
-// Stiff Position, soft orientation
-  //  K_p.diagonal() << 1500, 1500, 1500,  20,  20,  5;
+    // Stiff Position, soft orientation
+    // K_p.diagonal() << 1500, 1500, 1500,  20,  20,  5;
 
-// Stiff z-axis
-//    K_p.diagonal() << 400, 400, 1700,  40,  60,  12;
+    // Stiff z-axis
+    // K_p.diagonal() << 400, 400, 1700,  40,  60,  12;
     
     // Factorization Damping Desgin: Values between 0 and 1 (0: no damping and 1: fully damped)
-
     D_eta.diagonal() << 0.3, 0.3, 0.3, 0.4, 0.3, 0.4;
 
     C_hat.setZero();
@@ -139,16 +138,16 @@ void CartesianImpedanceP2P::starting(const ros::Time& /*time*/) {
 }
     
 void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duration& period) {
-    
+    // TIME
     mytime = mytime + period.toSec();
     
-    // get state variables
+    // GET STATE VARIABLES
     franka::RobotState robot_state        = state_handle->getRobotState();
     std::array<double, 7>  coriolis_array = model_handle->getCoriolis();
     std::array<double, 42> jacobian_array = model_handle->getZeroJacobian(franka::Frame::kEndEffector);
     std::array<double, 49> mass_array     = model_handle->getMass();
     
-    // convert to Eigen
+    // CONVERT TO EIGEN
     Eigen::Map<Eigen::Matrix<double, 7, 7>> mass(mass_array.data());
     Eigen::Map<Eigen::Matrix<double, 7, 1>> coriolis(coriolis_array.data());
     Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
@@ -269,9 +268,9 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     // POSITION ERROR
     error.head(3)  << curr_position - position_d;
     
-    // ORIENTATION ERROR (According to Silciano)
+    // ORIENTATION ERROR
     if (orientation_d.coeffs().dot(curr_orientation.coeffs()) < 0.0) {
-        curr_orientation.coeffs() << -curr_orientation.coeffs(); // take short way around the circle and by using positve dot product of quaternions
+        curr_orientation.coeffs() << -curr_orientation.coeffs(); // take short way around the circle by using positve dot product of quaternions
     }
     
     quat_d         <<    orientation_d.x(),    orientation_d.y(),    orientation_d.z();
@@ -288,12 +287,12 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     ddx.tail(3)    << domega_d;    
     
 ////////////////////////////////////////// CONTROLLER //////////////////////////////////////////////////////
-//////////     Soruce: Alin Albu-Schäffer: Cartesian Impedance Control of Redundant Robots:       /////////
+//////////     Source: Alin Albu-Schäffer: Cartesian Impedance Control of Redundant Robots:       //////////
 //////////////////          Recent Results with the DLR-Light-Weight-Arms, DLR    //////////////////////////
 
     Lambda         << (jacobian * mass_inv * jacobian.transpose()).inverse();
     
-    // Find best damping matrix: Factorization Damping Design
+    // Find best damping matrix with Factorization Damping Design
     A              << Lambda.sqrt();
     K_p1           << K_p.sqrt();
     K_d            << A * D_eta * K_p1 + K_p1 * D_eta * A;
@@ -303,14 +302,13 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
     } 
     
     F_tau          << Lambda * ddx - K_d * derror - K_p * error - C_hat * derror - Lambda * djacobian_filtered * dq - external_load;
-    
     tau_task       << jacobian.transpose() * F_tau;
     
-//     nullspace control
+    // Nullspace control
     N              << I - jacobian.transpose() * Lambda * jacobian * mass_inv;
     tau_nullspace  << N * (-K_N * (q - q_nullspace) - D_N * dq);
     
-//     Desired torque
+    // Desired torque
     tau_d          << tau_task + coriolis + tau_nullspace;
     q_nullspace    << q;
 /////////////////////////////////////////// end of controller ///////////////////////////////////////////////  
@@ -322,7 +320,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
         joint_handle[i].setCommand(tau_d(i));
     }
 
-    // UPDATE VALUES FOR FINITE DIFFERENCES
+    // UPDATE VALUES FOR FINITE DIFFERENCE METHOD
     jacobian_prev << jacobian;
     Lambda_prev   << Lambda;
     notFirstRun   =  true;
@@ -361,7 +359,7 @@ void CartesianImpedanceP2P::update(const ros::Time& /*time*/, const ros::Duratio
 }
 
 void CartesianImpedanceP2P::P2PMovement(const Eigen::Vector3d& target_position, const Eigen::Vector3d& target_angles, double time, double T){
-    
+    // Move between waypoints with quintic polynomials
     a3  =   10 / pow(T, 3);
     a4  = - 15 / pow(T, 4);
     a5  =    6 / pow(T, 5);
@@ -405,7 +403,7 @@ Eigen::Matrix<double, 7, 1> CartesianImpedanceP2P::saturateTorqueRate(const Eige
   
 void CartesianImpedanceP2P::Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input, 
     const Eigen::MatrixXd& y_prev,   Eigen::MatrixXd& y) {
-        
+    // Simple low pass filter       
     y.resize(rows,cols);
     y << (1 - filter_param) * y_prev + filter_param * input;
 }
@@ -432,7 +430,7 @@ void CartesianImpedanceP2P::GripperGrasp(double width, double speed, int force, 
 }  
 
 void CartesianImpedanceP2P::SetLoad(double mass_new, double mass_old, double time, double t){
-    
+    // Change load with quintic polynomials to avoid jumps
     if (m <= 1 && time < t && time > 0.002) {
         m    =  10 / pow(t, 3) * pow(time, 3) - 15 / pow(t, 4) * pow(time, 4) + 6 / pow(t, 5) * pow(time, 5);
         load = -9.81 * (mass_old + m * (mass_new - mass_old));
@@ -443,7 +441,7 @@ void CartesianImpedanceP2P::SetLoad(double mass_new, double mass_old, double tim
 }
 
 void CartesianImpedanceP2P::AdjustImpedance(const Eigen::Matrix<double, 6, 6>& K_p_target, const Eigen::Matrix<double, 6, 6>& D_eta_target, double a){
-    
+    // Change impedance characteristics slowly to avoid jumps
     K_p   <<   K_p * (1 - a) + a * K_p_target;
     D_eta << D_eta * (1 - a) + a * D_eta_target;
 }

@@ -96,7 +96,7 @@ bool CartesianImpedanceTrajectory::init(hardware_interface::RobotHW* robot_hw, r
     
     notFirstRun = false;
     
-    // define time of quintic trajectory
+    // define time of quintic trajectory that moves Panda to start of Trajectory
     T   =   5;
     a3  =   10 / pow(T, 3);
     a4  = - 15 / pow(T, 4);
@@ -138,16 +138,16 @@ void CartesianImpedanceTrajectory::starting(const ros::Time& /*time*/) {
 }
 
 void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::Duration& period) {
-    
+    // TIME
     mytime = mytime + period.toSec();
     
-    // get state variables
+    // GET STATE VARIABLES
     franka::RobotState robot_state        = state_handle->getRobotState();
     std::array<double, 7>  coriolis_array = model_handle->getCoriolis();
     std::array<double, 42> jacobian_array = model_handle->getZeroJacobian(franka::Frame::kEndEffector);
     std::array<double, 49> mass_array     = model_handle->getMass();
    
-    // convert to Eigen
+    // CONVERT TO EIGEN
     Eigen::Map<Eigen::Matrix<double, 7, 7>> mass(mass_array.data());  
     Eigen::Map<Eigen::Matrix<double, 7, 1>> coriolis(coriolis_array.data());
     Eigen::Map<Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
@@ -215,10 +215,10 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
             }
         } 
     }
-    if (i >= X.rows() - 1){    //free nullspace movement, when trajectory finished
-        //q_nullspace << q;
-        i = 0;
-        mytime = 0;
+    if (i >= X.rows() - 1){   
+        //q_nullspace << q;  //free nullspace movement, when trajectory finished
+        i = 0;               // commet out to stop, if trajecotry should not be repeated
+        mytime = 0;          // commet out to stop, if trajecotry should not be repeated
     } 
     
     // EXTERNAL MASS
@@ -230,9 +230,9 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
     // POSITION ERROR
     error.head(3)  << curr_position - position_d;
     
-    // ORIENTATION ERROR (According to Silciano)
+    // ORIENTATION ERROR
     if (orientation_d.coeffs().dot(curr_orientation.coeffs()) < 0.0) {
-        curr_orientation.coeffs() << -curr_orientation.coeffs(); // take short way around the circle and by using positve dot product of quaternions
+        curr_orientation.coeffs() << -curr_orientation.coeffs(); // take short way around the circle by using positve dot product of quaternions
     }
     
     quat_d         <<    orientation_d.x(),    orientation_d.y(),    orientation_d.z();
@@ -254,7 +254,7 @@ void CartesianImpedanceTrajectory::update(const ros::Time& /*time*/, const ros::
 
     Lambda         << (jacobian * mass_inv * jacobian.transpose()).inverse();
     
-    // Find best damping matrix: Factorization Damping Design
+    // Find best damping matrix with Factorization Damping Design
     K_p1           << K_p.sqrt();
     A              << Lambda.sqrt();
     K_d            << A * D_eta * K_p1 + K_p1 * D_eta * A;
@@ -333,7 +333,7 @@ Eigen::Matrix<double, 7, 1> CartesianImpedanceTrajectory::saturateTorqueRate(con
   
 void CartesianImpedanceTrajectory::Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input, 
     const Eigen::MatrixXd& y_prev, Eigen::MatrixXd& y) {
-        
+    // Simple low pass filter    
     y.resize(rows,cols);
     y << (1 - filter_param) * y_prev + filter_param * input;
 }

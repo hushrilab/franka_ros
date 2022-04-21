@@ -33,18 +33,14 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
 //   void stopping(const ros::Time&) override;
   
  private:
-  // Saturation
-  Eigen::Matrix<double, 7, 1> saturateTorqueRate(
-      const Eigen::Matrix<double, 7, 1>& tau_d_calculated,
-      const Eigen::Matrix<double, 7, 1>& tau_J_d);
-  
-  // Filter
+  // FUNCTIONS
+  Eigen::Matrix<double, 7, 1> saturateTorqueRate(const Eigen::Matrix<double, 7, 1>& tau_d_calculated, const Eigen::Matrix<double, 7, 1>& tau_J_d);
   void Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input,  const Eigen::MatrixXd& input_prev, Eigen::MatrixXd& y);
   void GripperMove(double width, double speed); 
   void GripperGrasp(double width, double speed, int force, double epsilon);
   void SetLoad(double mass_old, double mass_new, std::array<double, 3> vec2CoG, double time, double t);
   
-  //  Function to lad csv files; Source: https://stackoverflow.com/questions/34247057/how-to-read-csv-file-and-assign-to-eigen-matrix
+  //  Function to load csv files; Source: https://stackoverflow.com/questions/34247057/how-to-read-csv-file-and-assign-to-eigen-matrix
   template<typename M> M load_csv (const std::string & path, const std::string & filename) {
     std::ifstream indata;
     indata.open(path + filename);
@@ -62,15 +58,11 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
     return Eigen::Map<const Eigen::Matrix<typename M::Scalar, M::RowsAtCompileTime, M::ColsAtCompileTime, Eigen::RowMajor>>(values.data(), rows, values.size()/rows);
   }
   
-  std::unique_ptr<franka_hw::FrankaStateHandle> state_handle;
-  std::unique_ptr<franka_hw::FrankaModelHandle> model_handle;
-  std::vector<hardware_interface::JointHandle>  joint_handle;
-  
   // Load MATLAB trajectory
-  std::string filename = "BookTrajectory"; //"ArmSwing", "Hexagon", "BookTrajectory"
-
-  std::string path = "../rospackages/catkin_ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/" + filename + "/";
-  //std::string path = "../ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/" + filename + "/";
+  std::string foldername = "BookTrajectory"; //"ArmSwing", "Hexagon", "BookTrajectory"
+  // Path to CSV files
+  std::string path = "../rospackages/catkin_ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/" + foldername + "/";
+  //std::string path = "../ws/src/franka_ros/franka_example_controllers/MATLAB_Trajectories/" + foldername + "/";
 
   Eigen::MatrixXd X       = load_csv<Eigen::MatrixXd>(path,            "x.csv");
   Eigen::MatrixXd dX      = load_csv<Eigen::MatrixXd>(path,           "dx.csv");
@@ -85,10 +77,18 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   Eigen::MatrixXd D_mat   = load_csv<Eigen::MatrixXd>(path,        "D_eta.csv");
   Eigen::MatrixXd ExtLoad = load_csv<Eigen::MatrixXd>(path,     "Ext_load.csv");
   
+  // DEFINE VARIABLES
+  std::unique_ptr<franka_hw::FrankaStateHandle> state_handle;
+  std::unique_ptr<franka_hw::FrankaModelHandle> model_handle;
+  std::vector<hardware_interface::JointHandle>  joint_handle;
+  
   double i        = 0;
+  int    j        = 0;
   double mytime   = 0;
+  bool notFirstRun;
+  const double delta_tau_max_{1.0};  
 
-  // for quintic trajectory
+  // for quintic trajectory to start position
   double T;
   double a3;
   double a4;
@@ -97,20 +97,16 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   double ds  = 0;
   double dds = 0;
   
-  // Errors
+  // Vectors and Matrices
+  Eigen::Matrix<double, 6, 1> curr_velocity;
+  Eigen::Matrix<double, 6, 1> ddx;
   Eigen::Matrix<double, 6, 1> error;
   Eigen::Matrix<double, 6, 1> derror;
   Eigen::Matrix<double, 6, 1> dderror;
-  Eigen::Vector3d quat_d;
-  Eigen::Vector3d quat_c;
-
-  bool notFirstRun;
-  Eigen::Affine3d TransformationMatrix;
   Eigen::Matrix<double, 7, 7> mass_inv;
   Eigen::Matrix<double, 6, 6> Lambda;
   Eigen::Matrix<double, 6, 6> Lambda_prev;
   Eigen::Matrix<double, 6, 6> C_hat;
-  
   Eigen::Matrix<double, 6, 6> K_p;
   Eigen::Matrix<double, 6, 6> K_d;
   Eigen::Matrix<double, 7, 7> K_N;
@@ -131,16 +127,14 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   Eigen::Matrix<double, 5, 1> gripper_command;
   Eigen::Matrix<double, 4, 1> load;
   Eigen::Matrix<double, 6, 1> external_load;
-  Eigen::Vector3d lever;
-  
-    // Damping Desgin
   Eigen::Matrix<double, 6, 6> D_eta;
   Eigen::Matrix<double, 6, 6> K_p1;
   Eigen::Matrix<double, 6, 6> A;
-  
+  Eigen::Affine3d    TransformationMatrix;
+  Eigen::Vector3d    quat_d;
+  Eigen::Vector3d    quat_c;
+  Eigen::Vector3d    lever;
   Eigen::Vector3d    curr_position;
-  Eigen::Matrix<double, 6, 1> curr_velocity;
-  Eigen::Matrix<double, 6, 1> ddx;
   Eigen::Quaterniond curr_orientation;
   Eigen::Vector3d    position_d;
   Eigen::Vector3d    position_d_target;
@@ -154,8 +148,6 @@ class CartesianImpedanceTrajectory : public controller_interface::MultiInterface
   Eigen::Vector3d    omega_d;
   Eigen::Vector3d    domega_d;
 
-  const double delta_tau_max_{1.0};  
-  int j = 0;
 };
 
 }  // namespace franka_example_controllers

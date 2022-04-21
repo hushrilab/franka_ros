@@ -29,9 +29,10 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   bool init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& node_handle) override;
   void starting(const ros::Time&) override;
   void update(const ros::Time&, const ros::Duration& period) override;
+  //   void stopping(const ros::Time&) override;
 
  private:
-  // Saturation
+  // FUNCTIONS
   Eigen::Matrix<double, 7, 1> saturateTorqueRate(const Eigen::Matrix<double, 7, 1>& tau_d_calculated,const Eigen::Matrix<double, 7, 1>& tau_J_d);
   void P2PMovement(const Eigen::Vector3d& target_position, const Eigen::Vector3d& target_angles, double time, double T);
   void Filter(double filter_param, int rows, int cols, const Eigen::MatrixXd& input,  const Eigen::MatrixXd& input_prev, Eigen::MatrixXd& y);
@@ -40,24 +41,22 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   void SetLoad(double mass_old, double mass_new, double time, double t);
   void AdjustImpedance(const Eigen::Matrix<double, 6, 6>& K_p_target, const Eigen::Matrix<double, 6, 6>& D_eta_target, double a);
 
+  // DEFINE VARIABLES
   std::unique_ptr<franka_hw::FrankaStateHandle> state_handle;
   std::unique_ptr<franka_hw::FrankaModelHandle> model_handle;
   std::vector<hardware_interface::JointHandle>  joint_handle;
   
+  int j           = 0;
   double mytime   = 0;
   int waypoint    = 1;
   int GripperTask = 1;
-    
-  //     External Load (Alu block standing upright)
   double mass_load;
-  Eigen::Vector3d vec2CoG;
+  double load     = 0;
+  double m        = 0;
+  bool notFirstRun;
+  const double delta_tau_max_{1.0};  
   
-  Eigen::Matrix<double, 6, 1> external_load;
-  Eigen::Vector3d lever;
-  double load = 0;
-  double m    = 0;
-  
-    // for quintic trajectory
+  // for quintic trajectories
   double T;
   double a3;
   double a4;
@@ -66,20 +65,16 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   double ds  = 0; 
   double dds = 0; 
   
-  // Errors
+  Eigen::Matrix<double, 6, 1> curr_velocity;
+  Eigen::Matrix<double, 6, 1> ddx;
+  Eigen::Matrix<double, 6, 1> external_load;
   Eigen::Matrix<double, 6, 1> error;
   Eigen::Matrix<double, 6, 1> derror;
   Eigen::Matrix<double, 6, 1> dderror;
-  Eigen::Vector3d quat_d;
-  Eigen::Vector3d quat_c;
-
-  bool notFirstRun;
-  Eigen::Affine3d TransformationMatrix;
   Eigen::Matrix<double, 7, 7> mass_inv;
   Eigen::Matrix<double, 6, 6> Lambda;
   Eigen::Matrix<double, 6, 6> Lambda_prev;
   Eigen::Matrix<double, 6, 6> C_hat;
-  
   Eigen::Matrix<double, 6, 6> K_p;
   Eigen::Matrix<double, 6, 6> K_p_target;
   Eigen::Matrix<double, 6, 6> K_d;
@@ -96,16 +91,16 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   Eigen::Matrix<double, 6, 7> djacobian_filtered;
   Eigen::Matrix<double, 6, 7> jacobian_prev;
   Eigen::Matrix<double, 7, 1> tau_d_saturated;
-  
-    // Damping Desgin
   Eigen::Matrix<double, 6, 6> D_eta;
   Eigen::Matrix<double, 6, 6> D_eta_target;
   Eigen::Matrix<double, 6, 6> K_p1;
   Eigen::Matrix<double, 6, 6> A;
-  
+  Eigen::Vector3d    quat_d;
+  Eigen::Vector3d    quat_c;
+  Eigen::Vector3d    vec2CoG;
+  Eigen::Vector3d    lever;
+  Eigen::Affine3d    TransformationMatrix;
   Eigen::Vector3d    curr_position;
-  Eigen::Matrix<double, 6, 1> curr_velocity;
-  Eigen::Matrix<double, 6, 1> ddx;
   Eigen::Quaterniond curr_orientation;
   Eigen::Vector3d    position_d;
   Eigen::Vector3d    position_d_target;
@@ -119,9 +114,6 @@ class CartesianImpedanceP2P : public controller_interface::MultiInterfaceControl
   Eigen::Quaterniond orientation_d_target;
   Eigen::Vector3d    omega_d;
   Eigen::Vector3d    domega_d;
-  
-  const double delta_tau_max_{1.0};  
-  int j = 0;
 };
 
 }  // namespace franka_example_controllers
